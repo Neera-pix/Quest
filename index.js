@@ -177,7 +177,4 @@ const htmlContent = `
 app.get('/', (req, res) => res.send(htmlContent));
 
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log('Server running on port ' + PORT));
-
-bot.start((ctx) => ctx.reply('Привет! Нажми на кнопку меню, чтобы открыть квесты'));
-bot.launch();
+app.
