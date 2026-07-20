@@ -1,25 +1,52 @@
 const { Telegraf } = require('telegraf');
 const express = require('express');
-const app = express();
+const { Redis } = require('@upstash/redis');
 
+const app = express();
 const BOT_TOKEN = process.env.BOT_TOKEN;
 const ADMIN_ID = 6542247611;
 
+const redis = new Redis({
+  url: process.env.UPSTASH_REDIS_REST_URL,
+  token: process.env.UPSTASH_REDIS_REST_TOKEN,
+});
+
+const DEFAULT_DB = {
+    tasks: [
+        { id: 1, title: 'Приготовить завтрак', reward: 50 },
+        { id: 2, title: 'Обнять при встрече', reward: 20 }
+    ],
+    store: [
+        { id: 1, title: 'Массаж спины 15 мин', price: 100 },
+        { id: 2, title: 'Выбор фильма на вечер', price: 50 }
+    ],
+    balance: 0
+};
+
+async function getDB() {
+    try {
+        const data = await redis.get('quest_db');
+        if (!data) {
+            await redis.set('quest_db', DEFAULT_DB);
+            return DEFAULT_DB;
+        }
+        return typeof data === 'string' ? JSON.parse(data) : data;
+    } catch (e) {
+        console.error('Ошибка чтения из Redis:', e);
+        return DEFAULT_DB;
+    }
+}
+
+async function saveDB(db) {
+    try {
+        await redis.set('quest_db', db);
+    } catch (e) {
+        console.error('Ошибка записи в Redis:', e);
+    }
+}
+
 const bot = new Telegraf(BOT_TOKEN);
-
 app.use(express.json());
-
-let tasks = [
-    { id: 1, title: 'Приготовить завтрак', reward: 50 },
-    { id: 2, title: 'Обнять при встрече', reward: 20 }
-];
-
-let store = [
-    { id: 1, title: 'Массаж спины 15 мин', price: 100 },
-    { id: 2, title: 'Выбор фильма на вечер', price: 50 }
-];
-
-let userBalance = 0;
 
 async function notifyAdmin(text) {
     try {
@@ -29,57 +56,80 @@ async function notifyAdmin(text) {
     }
 }
 
-app.get('/api/data', (req, res) => {
-    res.json({ tasks, store, balance: userBalance });
+app.get('/api/data', async (req, res) => {
+    const db = await getDB();
+    res.json(db);
 });
 
-app.post('/api/add-task', (req, res) => {
+app.post('/api/update-balance', async (req, res) => {
+    const { balance } = req.body;
+    const db = await getDB();
+    if (balance !== undefined && !isNaN(balance)) {
+        db.balance = Number(balance);
+        await saveDB(db);
+    }
+    res.json({ success: true, balance: db.balance });
+});
+
+app.post('/api/add-task', async (req, res) => {
     const { title, reward } = req.body;
+    const db = await getDB();
     if (title && reward) {
-        tasks.push({ id: Date.now(), title, reward: Number(reward) });
+        db.tasks.push({ id: Date.now(), title, reward: Number(reward) });
+        await saveDB(db);
     }
-    res.json({ success: true, tasks });
+    res.json({ success: true, tasks: db.tasks });
 });
 
-app.post('/api/add-store', (req, res) => {
+app.post('/api/add-store', async (req, res) => {
     const { title, price } = req.body;
+    const db = await getDB();
     if (title && price) {
-        store.push({ id: Date.now(), title, price: Number(price) });
+        db.store.push({ id: Date.now(), title, price: Number(price) });
+        await saveDB(db);
     }
-    res.json({ success: true, store });
+    res.json({ success: true, store: db.store });
 });
 
-app.post('/api/delete-task', (req, res) => {
+app.post('/api/delete-task', async (req, res) => {
     const { id } = req.body;
-    tasks = tasks.filter(t => t.id !== id);
-    res.json({ success: true, tasks });
+    const db = await getDB();
+    db.tasks = db.tasks.filter(t => t.id !== id);
+    await saveDB(db);
+    res.json({ success: true, tasks: db.tasks });
 });
 
-app.post('/api/delete-store', (req, res) => {
+app.post('/api/delete-store', async (req, res) => {
     const { id } = req.body;
-    store = store.filter(s => s.id !== id);
-    res.json({ success: true, store });
+    const db = await getDB();
+    db.store = db.store.filter(s => s.id !== id);
+    await saveDB(db);
+    res.json({ success: true, store: db.store });
 });
 
 app.post('/api/complete-task', async (req, res) => {
     const { id } = req.body;
-    const task = tasks.find(t => t.id === id);
+    const db = await getDB();
+    const task = db.tasks.find(t => t.id === id);
     if (task) {
-        userBalance += task.reward;
-        tasks = tasks.filter(t => t.id !== id);
-        await notifyAdmin(`✅ Задание выполнено!\n«${task.title}» (+${task.reward} 🪙)\nТекущий баланс: ${userBalance} 🪙`);
+        db.balance += task.reward;
+        db.tasks = db.tasks.filter(t => t.id !== id);
+        await saveDB(db);
+        await notifyAdmin(`✅ Задание выполнено!\n«${task.title}» (+${task.reward} 🪙)\nТекущий баланс: ${db.balance} 🪙`);
     }
-    res.json({ success: true, balance: userBalance, tasks });
+    res.json({ success: true, balance: db.balance, tasks: db.tasks });
 });
 
 app.post('/api/buy-item', async (req, res) => {
     const { id } = req.body;
-    const item = store.find(s => s.id === id);
-    if (item && userBalance >= item.price) {
-        userBalance -= item.price;
-        store = store.filter(s => s.id !== id);
-        await notifyAdmin(`🎁 Покупка в магазине!\n«${item.title}» (-${item.price} 🪙)\nОстаток баланса: ${userBalance} 🪙`);
-        res.json({ success: true, balance: userBalance });
+    const db = await getDB();
+    const item = db.store.find(s => s.id === id);
+    if (item && db.balance >= item.price) {
+        db.balance -= item.price;
+        db.store = db.store.filter(s => s.id !== id);
+        await saveDB(db);
+        await notifyAdmin(`🎁 Покупка в магазине!\n«${item.title}» (-${item.price} 🪙)\nОстаток баланса: ${db.balance} 🪙`);
+        res.json({ success: true, balance: db.balance });
     } else {
         res.json({ success: false, message: 'Недостаточно монет!' });
     }
@@ -130,7 +180,8 @@ app.get('/', (req, res) => {
                 let tasksList = data.tasks.map(t => '<div class="item"><div>' + t.title + ' (+' + t.reward + ' 🪙)</div><button class="danger" style="width:auto;" onclick="deleteTask(' + t.id + ')">Удалить</button></div>').join('') || '<p>Заданий нет</p>';
                 let storeList = data.store.map(s => '<div class="item"><div>' + s.title + ' (' + s.price + ' 🪙)</div><button class="danger" style="width:auto;" onclick="deleteStore(' + s.id + ')">Удалить</button></div>').join('') || '<p>Товаров нет</p>';
 
-                app.innerHTML = '<div class="card"><h3>➕ Добавить квест</h3><input id="t-title" placeholder="Название"><input id="t-reward" type="number" placeholder="Награда"><button onclick="addTask()">Сохранить квест</button></div>' +
+                app.innerHTML = '<div class="card"><h3>💰 Управление балансом</h3><input id="new-balance" type="number" placeholder="Новое количество монет" value="' + data.balance + '"><button class="secondary" onclick="updateBalance()">Изменить баланс</button></div>' +
+                                '<div class="card"><h3>➕ Добавить квест</h3><input id="t-title" placeholder="Название"><input id="t-reward" type="number" placeholder="Награда"><button onclick="addTask()">Сохранить квест</button></div>' +
                                 '<div class="card"><h3>📋 Активные квесты</h3>' + tasksList + '</div>' +
                                 '<div class="card"><h3>➕ Добавить товар</h3><input id="s-title" placeholder="Название"><input id="s-price" type="number" placeholder="Цена"><button class="secondary" onclick="addStore()">Сохранить товар</button></div>' +
                                 '<div class="card"><h3>🎁 Товары в магазине</h3>' + storeList + '</div>';
@@ -141,6 +192,13 @@ app.get('/', (req, res) => {
                 app.innerHTML = '<div class="card"><h3>📋 Доступные квесты</h3>' + tasksHtml + '</div>' +
                                 '<div class="card"><h3>🎁 Магазин наград</h3>' + storeHtml + '</div>';
             }
+        }
+
+        async function updateBalance() {
+            const balance = document.getElementById('new-balance').value;
+            if(balance === '') return;
+            await fetch('/api/update-balance', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({balance}) });
+            loadData();
         }
 
         async function addTask() {
