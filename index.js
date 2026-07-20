@@ -14,7 +14,7 @@ const redis = new Redis({
 const EXP_MAP = { 1: 10, 2: 25, 3: 50, 4: 100 };
 
 const DEFAULT_DB = {
-    version: 3, // Флаг принудительного обновления для Redis
+    version: 4, // Версия 4 - принудительно обновит квесты
     tasks: [
         { id: 101, title: '«Без паразитов»', desc: 'Провести целый день, не используя в речи слова-паразиты («типа», «как бы», «короче», «ну»)', reward: 30, isOneTime: false, isSpecial: false, diff: 2 },
         { id: 102, title: '«Слово дня»', desc: 'Узнать значение редкого/красивого слова (например, эрудиция, эмпатия, контекст, лаконичность) и уместно использовать его в диалоге со мной 3 раза за день.', reward: 25, isOneTime: false, isSpecial: false, diff: 1 },
@@ -49,13 +49,18 @@ const DEFAULT_DB = {
     exp: 0
 };
 
+function calcLevel(exp) {
+    return Math.floor(exp / 200) + 1;
+}
+
 async function getDB() {
     try {
         let data = await redis.get('quest_db');
         if (typeof data === 'string') data = JSON.parse(data);
         
-        if (!data || data.version !== 3) {
-            const merged = { ...DEFAULT_DB, balance: data?.balance || 0, exp: data?.exp || 0, level: data?.level || 1, inventory: data?.inventory || [] };
+        if (!data || data.version !== 4) {
+            const merged = { ...DEFAULT_DB, balance: data?.balance || 0, exp: data?.exp || 0, inventory: data?.inventory || [] };
+            merged.level = calcLevel(merged.exp);
             await redis.set('quest_db', merged);
             return merged;
         }
@@ -70,8 +75,9 @@ async function saveDB(db) { await redis.set('quest_db', db); }
 const bot = new Telegraf(BOT_TOKEN);
 app.use(express.json());
 
-async function notifyAdmin(text) {
-    try { await bot.telegram.sendMessage(ADMIN_ID, text); } catch (e) {}
+// Отправка в фоне, чтобы интерфейс не зависал!
+function notifyAdmin(text) {
+    bot.telegram.sendMessage(ADMIN_ID, text).catch(() => {});
 }
 
 app.get('/api/data', async (req, res) => { res.json(await getDB()); });
@@ -80,8 +86,11 @@ app.post('/api/update-stats', async (req, res) => {
     const { balance, level, exp } = req.body;
     const db = await getDB();
     if (balance !== undefined) db.balance = Number(balance);
-    if (level !== undefined) db.level = Number(level);
-    if (exp !== undefined) db.exp = Number(exp);
+    if (exp !== undefined) {
+        db.exp = Number(exp);
+        db.level = calcLevel(db.exp);
+    }
+    if (level !== undefined && exp === undefined) db.level = Number(level);
     await saveDB(db);
     res.json(db);
 });
@@ -124,9 +133,10 @@ app.post('/api/complete-task', async (req, res) => {
         const gainedExp = EXP_MAP[task.diff] || 10;
         db.balance += task.reward;
         db.exp += gainedExp;
+        db.level = calcLevel(db.exp);
         if (task.isOneTime) db.tasks = db.tasks.filter(t => Number(t.id) !== Number(id));
         await saveDB(db);
-        await notifyAdmin(`✅ Задание выполнено!\n«${task.title}»\n+${task.reward} 🪙 | +${gainedExp} EXP\nТекущий баланс: ${db.balance} 🪙`);
+        notifyAdmin(`✅ Задание выполнено!\n«${task.title}»\n+${task.reward} 🪙 | +${gainedExp} EXP\nТекущий баланс: ${db.balance} 🪙\nТекущий уровень: ${db.level}`);
     }
     res.json(db);
 });
@@ -140,7 +150,7 @@ app.post('/api/buy-item', async (req, res) => {
         db.inventory.push({ invId: Date.now(), title: item.title, desc: item.desc });
         if (item.isOneTime) db.store = db.store.filter(s => Number(s.id) !== Number(id));
         await saveDB(db);
-        await notifyAdmin(`🛍 Куплен товар!\n«${item.title}» отправлен в инвентарь!\nОстаток: ${db.balance} 🪙`);
+        notifyAdmin(`🛍 Куплен товар!\n«${item.title}» отправлен в инвентарь!\nОстаток: ${db.balance} 🪙`);
         res.json({ success: true, db });
     } else {
         res.json({ success: false, message: 'Недостаточно монет!' });
@@ -154,7 +164,7 @@ app.post('/api/use-inventory', async (req, res) => {
     if (item) {
         db.inventory = db.inventory.filter(i => Number(i.invId) !== Number(invId));
         await saveDB(db);
-        await notifyAdmin(`🔥 ИСПОЛЬЗОВАН ПРЕДМЕТ ИЗ ИНВЕНТАРЯ 🔥\n«${item.title}»`);
+        notifyAdmin(`🔥 ИСПОЛЬЗОВАН ПРЕДМЕТ ИЗ ИНВЕНТАРЯ 🔥\n«${item.title}»`);
     }
     res.json(db);
 });
@@ -181,7 +191,7 @@ app.get('/', (req, res) => {
         .exp-text { font-size: 11px; color: #aaa; margin-top: 4px; }
 
         .tabs-wrapper { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; padding: 8px; background: var(--bg); position: sticky; top: 0; z-index: 10; border-bottom: 1px solid #333;}
-        .tab-btn { padding: 10px 4px; text-align: center; background: var(--card); color: var(--sub); font-weight: bold; border-radius: 8px; border: 1px solid #333; font-size: 11px; display: flex; align-items: center; justify-content: center;}
+        .tab-btn { padding: 10px 4px; text-align: center; background: var(--card); color: var(--sub); font-weight: bold; border-radius: 8px; border: 1px solid #333; font-size: 11px; display: flex; align-items: center; justify-content: center; cursor: pointer;}
         .tab-btn.active { background: var(--accent); color: #fff; border-color: var(--accent); }
 
         .container { padding: 15px; }
@@ -195,7 +205,7 @@ app.get('/', (req, res) => {
         button.small { width: auto; padding: 8px 12px; font-size: 12px; margin-left: 5px;}
 
         .item-row { border: 1px solid #333; border-radius: 12px; margin-bottom: 10px; background: #1a1a1e; }
-        .item-header { padding: 12px; display: flex; justify-content: space-between; align-items: center; }
+        .item-header { padding: 12px; display: flex; justify-content: space-between; align-items: center; cursor: pointer;}
         .item-title-block { display: flex; flex-direction: column; gap: 4px; flex-grow:1; }
         .item-title { font-weight: bold; font-size: 14px; display: flex; align-items: center; gap: 6px; line-height: 1.2;}
         .item-tags { display: flex; gap: 5px; font-size: 10px; flex-wrap: wrap; }
@@ -242,7 +252,15 @@ app.get('/', (req, res) => {
         let currentTab = 'tasks';
         const diffColors = { 1: '🟢 Легко', 2: '🟡 Средне', 3: '🔴 Сложно', 4: '🟣 Ультра' };
 
-        function alertMsg(msg) { if(tg.showAlert) tg.showAlert(msg); else alert(msg); }
+        function escapeHtml(str) {
+            if (!str) return '';
+            return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+        }
+
+        function alertMsg(msg) { 
+            if(tg.showAlert) tg.showAlert(msg); else alert(msg); 
+        }
+
         function confirmAction(msg, callback) {
             if(tg.showConfirm) tg.showConfirm(msg, (res) => { if(res) callback(); });
             else if(confirm(msg)) callback();
@@ -258,8 +276,8 @@ app.get('/', (req, res) => {
         function updateHeader() {
             document.getElementById('ui-level').innerText = 'Уровень ' + g_db.level;
             document.getElementById('ui-balance').innerText = '💰 ' + g_db.balance;
-            document.getElementById('ui-exp-text').innerText = 'Общий EXP: ' + g_db.exp;
-            let fill = (g_db.exp % 1000) / 10; 
+            document.getElementById('ui-exp-text').innerText = 'Общий EXP: ' + g_db.exp + ' / ' + (g_db.level * 200);
+            let fill = (g_db.exp % 200) / 2; // каждые 200 опыта - новый уровень
             document.getElementById('ui-exp-fill').style.width = fill + '%';
         }
 
@@ -319,9 +337,7 @@ app.get('/', (req, res) => {
                         <h3>📊 Статистика Игрока</h3>
                         <label>Монеты:</label>
                         <input id="st-bal" type="number" value="\${g_db.balance}">
-                        <label>Уровень:</label>
-                        <input id="st-lvl" type="number" value="\${g_db.level}">
-                        <label>Опыт:</label>
+                        <label>Опыт (Уровень рассчитается сам):</label>
                         <input id="st-exp" type="number" value="\${g_db.exp}">
                         <button class="action" onclick="updateStats()">Сохранить статы</button>
                     </div>
@@ -361,8 +377,8 @@ app.get('/', (req, res) => {
                 }
             }
 
-            const safeTitle = item.title.replace(/"/g, '&quot;').replace(/'/g, '&#39;');
-            const safeDesc = (item.desc || '').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+            const safeTitle = escapeHtml(item.title);
+            const safeDesc = escapeHtml(item.desc);
 
             let editForm = (isAdmin && !isInv) ? \`
                 <div class="admin-edit-form item-body" id="edit-\${uid}">
@@ -385,13 +401,13 @@ app.get('/', (req, res) => {
                 <div class="item-row">
                     <div class="item-header" onclick="toggleDesc('desc-\${uid}')">
                         <div class="item-title-block">
-                            <div class="item-title">\${diffIcon}\${item.title}</div>
+                            <div class="item-title">\${diffIcon}\${safeTitle}</div>
                             \${tagsHtml ? \`<div class="item-tags">\${tagsHtml}</div>\` : ''}
                         </div>
                         \${valLabel ? \`<div class="item-val">\${valLabel} 🪙</div>\` : ''}
                     </div>
                     <div class="item-body" id="desc-\${uid}">
-                        \${item.desc || (isInv ? 'Без описания' : '')}
+                        \${safeDesc || (isInv ? 'Без описания' : '')}
                         <div class="item-actions">\${actions}</div>
                     </div>
                     \${editForm}
@@ -401,11 +417,11 @@ app.get('/', (req, res) => {
 
         window.updateStats = async function() {
             const b = document.getElementById('st-bal').value;
-            const l = document.getElementById('st-lvl').value;
             const e = document.getElementById('st-exp').value;
-            const res = await fetch('/api/update-stats', { method: 'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({balance:b, level:l, exp:e}) });
+            const res = await fetch('/api/update-stats', { method: 'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({balance:b, exp:e}) });
             g_db = await res.json();
-            updateHeader(); alertMsg('Статистика сохранена!');
+            updateHeader(); 
+            alertMsg('Статистика сохранена!');
         }
 
         window.saveItem = async function(type, id = null) {
@@ -448,6 +464,7 @@ app.get('/', (req, res) => {
         }
 
         window.completeTask = async function(id) {
+            if(tg.HapticFeedback) tg.HapticFeedback.impactOccurred('medium');
             const res = await fetch('/api/complete-task', { method: 'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({id}) });
             g_db = await res.json();
             updateHeader(); showTab(currentTab);
@@ -455,6 +472,7 @@ app.get('/', (req, res) => {
         }
 
         window.buyItem = async function(id) {
+            if(tg.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
             const res = await fetch('/api/buy-item', { method: 'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({id}) });
             const data = await res.json();
             if(!data.success) return alertMsg(data.message);
@@ -465,6 +483,7 @@ app.get('/', (req, res) => {
 
         window.useInv = function(invId) {
             confirmAction('Использовать предмет прямо сейчас?', async () => {
+                if(tg.HapticFeedback) tg.HapticFeedback.impactOccurred('heavy');
                 const res = await fetch('/api/use-inventory', { method: 'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({invId}) });
                 g_db = await res.json();
                 showTab(currentTab);
