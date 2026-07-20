@@ -121,7 +121,7 @@ app.post('/api/complete-task', async (req, res) => {
         db.exp += gainedExp;
         if (task.isOneTime) db.tasks = db.tasks.filter(t => Number(t.id) !== Number(id));
         await saveDB(db);
-        await notifyAdmin(\`✅ Задание выполнено!\n«\${task.title}»\n+\${task.reward} 🪙 | +\${gainedExp} EXP\nТекущий баланс: \${db.balance} 🪙\`);
+        await notifyAdmin(`✅ Задание выполнено!\n«${task.title}»\n+${task.reward} 🪙 | +${gainedExp} EXP\nТекущий баланс: ${db.balance} 🪙`);
     }
     res.json(db);
 });
@@ -135,7 +135,7 @@ app.post('/api/buy-item', async (req, res) => {
         db.inventory.push({ invId: Date.now(), title: item.title, desc: item.desc });
         if (item.isOneTime) db.store = db.store.filter(s => Number(s.id) !== Number(id));
         await saveDB(db);
-        await notifyAdmin(\`🛍 Куплен товар!\n«\${item.title}» отправлен в инвентарь!\n-\${item.price} 🪙\nОстаток: \${db.balance} 🪙\`);
+        await notifyAdmin(`🛍 Куплен товар!\n«${item.title}» отправлен в инвентарь!\n-${item.price} 🪙\nОстаток: ${db.balance} 🪙`);
         res.json({ success: true, db });
     } else {
         res.json({ success: false, message: 'Недостаточно монет!' });
@@ -149,13 +149,13 @@ app.post('/api/use-inventory', async (req, res) => {
     if (item) {
         db.inventory = db.inventory.filter(i => Number(i.invId) !== Number(invId));
         await saveDB(db);
-        await notifyAdmin(\`🔥 ИСПОЛЬЗОВАН ПРЕДМЕТ ИЗ ИНВЕНТАРЯ 🔥\n«\${item.title}»\nПора действовать!\`);
+        await notifyAdmin(`🔥 ИСПОЛЬЗОВАН ПРЕДМЕТ ИЗ ИНВЕНТАРЯ 🔥\n«${item.title}»\nПора действовать!`);
     }
     res.json(db);
 });
 
 app.get('/', (req, res) => {
-    res.send(\`
+    res.send(`
 <!DOCTYPE html>
 <html lang="ru">
 <head>
@@ -175,7 +175,6 @@ app.get('/', (req, res) => {
         .exp-bar-fill { height: 100%; background: linear-gradient(90deg, #6b4cff, #a288ff); width: 0%; transition: 0.3s; }
         .exp-text { font-size: 11px; color: #aaa; margin-top: 4px; }
 
-        /* Компактная сетка для вкладок */
         .tabs-wrapper { 
             display: grid; 
             grid-template-columns: repeat(3, 1fr); 
@@ -299,7 +298,6 @@ app.get('/', (req, res) => {
 
             if (tab === 'tasks' || tab === 'tasks-sp') {
                 const isSp = (tab === 'tasks-sp');
-                // Сортировка по сложности (от легкого к сложному)
                 const list = g_db.tasks.filter(t => t.isSpecial === isSp).sort((a, b) => a.diff - b.diff);
                 html += list.map(t => renderItem(t, 'task')).join('') || '<p>Тут пока пусто.</p>';
             } 
@@ -384,8 +382,8 @@ app.get('/', (req, res) => {
 
             let editForm = (isAdmin && !isInv) ? \`
                 <div class="admin-edit-form" id="edit-\${uid}" style="display:none;">
-                    <input id="et-\${uid}" value='\${item.title}'>
-                    <textarea id="ed-\${uid}" rows="2">\${item.desc}</textarea>
+                    <input id="et-\${uid}" value='\${item.title.replace(/'/g, "&#39;")}'>
+                    <textarea id="ed-\${uid}" rows="2">\${(item.desc || '').replace(/'/g, "&#39;")}</textarea>
                     <input id="ev-\${uid}" type="number" value="\${isTask ? item.reward : item.price}">
                     <select id="edf-\${uid}" style="display:\${isTask ? 'block' : 'none'}">
                         <option value="1" \${item.diff==1?'selected':''}>Легко</option>
@@ -496,7 +494,7 @@ app.get('/', (req, res) => {
     </script>
 </body>
 </html>
-    \`);
+`);
 });
 
 const PORT = process.env.PORT || 3000;
