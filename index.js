@@ -13,12 +13,12 @@ const redis = new Redis({
 
 const DEFAULT_DB = {
     tasks: [
-        { id: 1, title: 'Приготовить завтрак', reward: 50 },
-        { id: 2, title: 'Обнять при встрече', reward: 20 }
+        { id: 1, title: 'Приготовить завтрак', reward: 50, isOneTime: false },
+        { id: 2, title: 'Прочитать 15 страниц книги', reward: 30, isOneTime: false }
     ],
     store: [
-        { id: 1, title: 'Массаж спины 15 мин', price: 100 },
-        { id: 2, title: 'Выбор фильма на вечер', price: 50 }
+        { id: 1, title: 'Массаж спины 15 мин', price: 100, isOneTime: false },
+        { id: 2, title: 'Выбор фильма на вечер', price: 70, isOneTime: false }
     ],
     balance: 0
 };
@@ -72,20 +72,20 @@ app.post('/api/update-balance', async (req, res) => {
 });
 
 app.post('/api/add-task', async (req, res) => {
-    const { title, reward } = req.body;
+    const { title, reward, isOneTime } = req.body;
     const db = await getDB();
     if (title && reward) {
-        db.tasks.push({ id: Date.now(), title, reward: Number(reward) });
+        db.tasks.push({ id: Date.now(), title, reward: Number(reward), isOneTime: Boolean(isOneTime) });
         await saveDB(db);
     }
     res.json({ success: true, tasks: db.tasks });
 });
 
 app.post('/api/add-store', async (req, res) => {
-    const { title, price } = req.body;
+    const { title, price, isOneTime } = req.body;
     const db = await getDB();
     if (title && price) {
-        db.store.push({ id: Date.now(), title, price: Number(price) });
+        db.store.push({ id: Date.now(), title, price: Number(price), isOneTime: Boolean(isOneTime) });
         await saveDB(db);
     }
     res.json({ success: true, store: db.store });
@@ -113,7 +113,9 @@ app.post('/api/complete-task', async (req, res) => {
     const task = db.tasks.find(t => t.id === id);
     if (task) {
         db.balance += task.reward;
-        db.tasks = db.tasks.filter(t => t.id !== id);
+        if (task.isOneTime) {
+            db.tasks = db.tasks.filter(t => t.id !== id);
+        }
         await saveDB(db);
         await notifyAdmin(`✅ Задание выполнено!\n«${task.title}» (+${task.reward} 🪙)\nТекущий баланс: ${db.balance} 🪙`);
     }
@@ -126,10 +128,12 @@ app.post('/api/buy-item', async (req, res) => {
     const item = db.store.find(s => s.id === id);
     if (item && db.balance >= item.price) {
         db.balance -= item.price;
-        db.store = db.store.filter(s => s.id !== id);
+        if (item.isOneTime) {
+            db.store = db.store.filter(s => s.id !== id);
+        }
         await saveDB(db);
         await notifyAdmin(`🎁 Покупка в магазине!\n«${item.title}» (-${item.price} 🪙)\nОстаток баланса: ${db.balance} 🪙`);
-        res.json({ success: true, balance: db.balance });
+        res.json({ success: true, balance: db.balance, store: db.store });
     } else {
         res.json({ success: false, message: 'Недостаточно монет!' });
     }
@@ -149,48 +153,112 @@ app.get('/', (req, res) => {
         h2, h3 { margin-top: 0; }
         input, button { width: 100%; padding: 10px; margin-top: 8px; border-radius: 8px; border: none; box-sizing: border-box; }
         input { background: #3a3a3c; color: white; }
-        button { background: #007aff; color: white; font-weight: bold; }
+        button { background: #007aff; color: white; font-weight: bold; cursor: pointer; }
         button.secondary { background: #34c759; }
         button.danger { background: #ff3b30; }
-        .item { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #3a3a3c; padding: 8px 0; }
+        .item { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #3a3a3c; padding: 10px 0; }
         .badge { background: #ffd60a; color: #000; padding: 3px 8px; border-radius: 12px; font-weight: bold; }
+        .tag { font-size: 11px; padding: 2px 6px; border-radius: 6px; background: #48484a; color: #ccc; margin-left: 6px; }
+        
+        /* Вкладки */
+        .tabs { display: flex; gap: 8px; margin-bottom: 15px; }
+        .tab-btn { flex: 1; padding: 12px; background: #2c2c2e; color: #8e8e93; font-size: 15px; font-weight: bold; border-radius: 10px; border: none; }
+        .tab-btn.active { background: #007aff; color: #fff; }
+        
+        .checkbox-label { display: flex; align-items: center; gap: 8px; margin-top: 10px; font-size: 14px; color: #ccc; cursor: pointer; }
+        .checkbox-label input { width: auto; margin: 0; }
     </style>
 </head>
 <body>
     <h2>🎯 Квесты & Магазин</h2>
     <div class="card">Баланс: <span id="balance" class="badge">0 🪙</span></div>
-    <div id="app"></div>
+
+    <div class="tabs">
+        <button id="tab-tasks-btn" class="tab-btn active" onclick="switchTab('tasks')">📋 Квесты</button>
+        <button id="tab-store-btn" class="tab-btn" onclick="switchTab('store')">🎁 Магазин</button>
+    </div>
+
+    <div id="tab-tasks"></div>
+    <div id="tab-store" style="display: none;"></div>
 
     <script>
         const tg = window.Telegram.WebApp;
         tg.expand();
         const userId = tg.initDataUnsafe?.user?.id || 0;
         const isAdmin = (userId == ${ADMIN_ID});
+        let currentTab = 'tasks';
+        let globalData = { tasks: [], store: [], balance: 0 };
+
+        function switchTab(tab) {
+            currentTab = tab;
+            document.getElementById('tab-tasks-btn').classList.toggle('active', tab === 'tasks');
+            document.getElementById('tab-store-btn').classList.toggle('active', tab === 'store');
+            document.getElementById('tab-tasks').style.display = tab === 'tasks' ? 'block' : 'none';
+            document.getElementById('tab-store').style.display = tab === 'store' ? 'block' : 'none';
+        }
 
         async function loadData() {
             const res = await fetch('/api/data');
-            const data = await res.json();
-            document.getElementById('balance').innerText = data.balance + ' 🪙';
-            render(data);
+            globalData = await res.json();
+            document.getElementById('balance').innerText = globalData.balance + ' 🪙';
+            render();
         }
 
-        function render(data) {
-            const app = document.getElementById('app');
+        function render() {
+            const tasksContainer = document.getElementById('tab-tasks');
+            const storeContainer = document.getElementById('tab-store');
+
             if (isAdmin) {
-                let tasksList = data.tasks.map(t => '<div class="item"><div>' + t.title + ' (+' + t.reward + ' 🪙)</div><button class="danger" style="width:auto;" onclick="deleteTask(' + t.id + ')">Удалить</button></div>').join('') || '<p>Заданий нет</p>';
-                let storeList = data.store.map(s => '<div class="item"><div>' + s.title + ' (' + s.price + ' 🪙)</div><button class="danger" style="width:auto;" onclick="deleteStore(' + s.id + ')">Удалить</button></div>').join('') || '<p>Товаров нет</p>';
+                // Админка: Квесты
+                let tasksList = globalData.tasks.map(t => 
+                    '<div class="item"><div><b>' + t.title + '</b> (+' + t.reward + ' 🪙)' +
+                    '<span class="tag">' + (t.isOneTime ? 'Одноразовое' : 'Многоразовое') + '</span></div>' +
+                    '<button class="danger" style="width:auto;" onclick="deleteTask(' + t.id + ')">Удалить</button></div>'
+                ).join('') || '<p>Заданий пока нет</p>';
 
-                app.innerHTML = '<div class="card"><h3>💰 Управление балансом</h3><input id="new-balance" type="number" placeholder="Новое количество монет" value="' + data.balance + '"><button class="secondary" onclick="updateBalance()">Изменить баланс</button></div>' +
-                                '<div class="card"><h3>➕ Добавить квест</h3><input id="t-title" placeholder="Название"><input id="t-reward" type="number" placeholder="Награда"><button onclick="addTask()">Сохранить квест</button></div>' +
-                                '<div class="card"><h3>📋 Активные квесты</h3>' + tasksList + '</div>' +
-                                '<div class="card"><h3>➕ Добавить товар</h3><input id="s-title" placeholder="Название"><input id="s-price" type="number" placeholder="Цена"><button class="secondary" onclick="addStore()">Сохранить товар</button></div>' +
-                                '<div class="card"><h3>🎁 Товары в магазине</h3>' + storeList + '</div>';
+                tasksContainer.innerHTML = 
+                    '<div class="card"><h3>➕ Добавить квест</h3>' +
+                    '<input id="t-title" placeholder="Название квеста">' +
+                    '<input id="t-reward" type="number" placeholder="Награда (монет)">' +
+                    '<label class="checkbox-label"><input id="t-onetime" type="checkbox" checked> Одноразовое задание</label>' +
+                    '<button onclick="addTask()">Сохранить квест</button></div>' +
+                    '<div class="card"><h3>📋 Активные квесты</h3>' + tasksList + '</div>';
+
+                // Админка: Магазин
+                let storeList = globalData.store.map(s => 
+                    '<div class="item"><div><b>' + s.title + '</b> (' + s.price + ' 🪙)' +
+                    '<span class="tag">' + (s.isOneTime ? 'Одноразовое' : 'Многоразовое') + '</span></div>' +
+                    '<button class="danger" style="width:auto;" onclick="deleteStore(' + s.id + ')">Удалить</button></div>'
+                ).join('') || '<p>Товаров пока нет</p>';
+
+                storeContainer.innerHTML = 
+                    '<div class="card"><h3>💰 Управление балансом</h3>' +
+                    '<input id="new-balance" type="number" placeholder="Новое количество монет" value="' + globalData.balance + '">' +
+                    '<button class="secondary" onclick="updateBalance()">Изменить баланс</button></div>' +
+                    '<div class="card"><h3>➕ Добавить товар</h3>' +
+                    '<input id="s-title" placeholder="Название товара">' +
+                    '<input id="s-price" type="number" placeholder="Цена (монет)">' +
+                    '<label class="checkbox-label"><input id="s-onetime" type="checkbox" checked> Одноразовый товар</label>' +
+                    '<button class="secondary" onclick="addStore()">Сохранить товар</button></div>' +
+                    '<div class="card"><h3>🎁 Товары в магазине</h3>' + storeList + '</div>';
             } else {
-                let tasksHtml = data.tasks.map(t => '<div class="item"><div>' + t.title + ' (+' + t.reward + ' 🪙)</div><button style="width:auto;" onclick="completeTask(' + t.id + ')">Сделано</button></div>').join('') || '<p>Квестов нет</p>';
-                let storeHtml = data.store.map(s => '<div class="item"><div>' + s.title + ' (' + s.price + ' 🪙)</div><button class="secondary" style="width:auto;" onclick="buyItem(' + s.id + ')">Купить</button></div>').join('') || '<p>Магазин пуст</p>';
+                // Пользователь: Квесты
+                let tasksHtml = globalData.tasks.map(t => 
+                    '<div class="item"><div><b>' + t.title + '</b> (+' + t.reward + ' 🪙)' +
+                    '<span class="tag">' + (t.isOneTime ? '1 раз' : 'Многоразово') + '</span></div>' +
+                    '<button style="width:auto;" onclick="completeTask(' + t.id + ')">Сделано</button></div>'
+                ).join('') || '<p>Доступных квестов пока нет</p>';
 
-                app.innerHTML = '<div class="card"><h3>📋 Доступные квесты</h3>' + tasksHtml + '</div>' +
-                                '<div class="card"><h3>🎁 Магазин наград</h3>' + storeHtml + '</div>';
+                tasksContainer.innerHTML = '<div class="card"><h3>📋 Доступные квесты</h3>' + tasksHtml + '</div>';
+
+                // Пользователь: Магазин
+                let storeHtml = globalData.store.map(s => 
+                    '<div class="item"><div><b>' + s.title + '</b> (' + s.price + ' 🪙)' +
+                    '<span class="tag">' + (s.isOneTime ? '1 раз' : 'Многоразово') + '</span></div>' +
+                    '<button class="secondary" style="width:auto;" onclick="buyItem(' + s.id + ')">Купить</button></div>'
+                ).join('') || '<p>Магазин пуст</p>';
+
+                storeContainer.innerHTML = '<div class="card"><h3>🎁 Магазин наград</h3>' + storeHtml + '</div>';
             }
         }
 
@@ -204,16 +272,18 @@ app.get('/', (req, res) => {
         async function addTask() {
             const title = document.getElementById('t-title').value;
             const reward = document.getElementById('t-reward').value;
+            const isOneTime = document.getElementById('t-onetime').checked;
             if(!title || !reward) return;
-            await fetch('/api/add-task', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({title, reward}) });
+            await fetch('/api/add-task', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({title, reward, isOneTime}) });
             loadData();
         }
 
         async function addStore() {
             const title = document.getElementById('s-title').value;
             const price = document.getElementById('s-price').value;
+            const isOneTime = document.getElementById('s-onetime').checked;
             if(!title || !price) return;
-            await fetch('/api/add-store', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({title, price}) });
+            await fetch('/api/add-store', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({title, price, isOneTime}) });
             loadData();
         }
 
