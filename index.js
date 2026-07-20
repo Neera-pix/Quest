@@ -11,24 +11,24 @@ const redis = new Redis({
   token: process.env.UPSTASH_REDIS_REST_TOKEN,
 });
 
-// Кастомный опыт за каждый уровень сложности
 const EXP_MAP = { 1: 10, 2: 25, 3: 50, 4: 100 };
 
 const DEFAULT_DB = {
+    version: 3, // Флаг принудительного обновления для Redis
     tasks: [
-        { id: 101, title: '«Без паразитов»', desc: 'Провести целый день, не используя в речи слова-паразиты («типа», «как бы», «короче», «ну»).', reward: 30, isOneTime: false, isSpecial: false, diff: 2 },
+        { id: 101, title: '«Без паразитов»', desc: 'Провести целый день, не используя в речи слова-паразиты («типа», «как бы», «короче», «ну»)', reward: 30, isOneTime: false, isSpecial: false, diff: 2 },
         { id: 102, title: '«Слово дня»', desc: 'Узнать значение редкого/красивого слова (например, эрудиция, эмпатия, контекст, лаконичность) и уместно использовать его в диалоге со мной 3 раза за день.', reward: 25, isOneTime: false, isSpecial: false, diff: 1 },
-        { id: 103, title: '«Мастер пересказа»', desc: 'Посмотреть увлекательное видео или прочитать статью и за 2 минуты эмоционально и красиво пересказать мне суть.', reward: 30, isOneTime: false, isSpecial: false, diff: 2 },
-        { id: 104, title: '«Никаких матов»', desc: 'Продержаться 24 часа без единого матерного слова (выражать эмоции только богатым литературным языком).', reward: 60, isOneTime: true, isSpecial: false, diff: 3 },
+        { id: 103, title: '«Мастер пересказа»', desc: 'Посмотреть увлекательное видео или прочитать статью и за 2 минуты эмоционально и красиво пересказать мне суть', reward: 30, isOneTime: false, isSpecial: false, diff: 2 },
+        { id: 104, title: '«Никаких матов»', desc: 'Продержаться 24 часа без единого матерного слова (выражать эмоции только богатым литературным языком)', reward: 60, isOneTime: true, isSpecial: false, diff: 3 },
         { id: 105, title: '«Голосовое эссе»', desc: 'Записать мне аудиосообщение на 2-3 минуты с размышлением на любую тему без пауз, мычания и заминок.', reward: 35, isOneTime: false, isSpecial: false, diff: 2 },
-        { id: 106, title: '«Адвокат дьявола»', desc: 'Выбрать любую спорную тему и аргументированно защитить точку зрения, с которой сам изначально не согласен.', reward: 35, isOneTime: false, isSpecial: false, diff: 3 },
+        { id: 106, title: '«Адвокат дьявола»', desc: 'Выбрать любую спорную тему и аргументированно защитить точку зрения, с которой сам изначально не согласен', reward: 35, isOneTime: false, isSpecial: false, diff: 3 },
         { id: 107, title: 'Прочитать книгу (около 500 страниц)', desc: '', reward: 650, isOneTime: false, isSpecial: false, diff: 4 },
         { id: 108, title: '«Логическая ловушка»', desc: 'Узнать, что такое 2 любых логических когнитивных искажения (например, «ошибка выжившего» или «эффект Даннинга-Крюгера») и объяснить их мне простыми словами.', reward: 35, isOneTime: false, isSpecial: false, diff: 2 },
-        { id: 109, title: '«Без гаджетов»', desc: 'Заниматься саморазвитием, чтением или размышлениями 2 часа без телефона и соцсетей.', reward: 45, isOneTime: false, isSpecial: false, diff: 3 },
+        { id: 109, title: '«Без гаджетов»', desc: 'Заниматься саморазвитием, чтением или размышлениями 2 часа без телефона и соцсетей', reward: 45, isOneTime: false, isSpecial: false, diff: 3 },
         { id: 110, title: '«Факт дня»', desc: 'Узнать 1 интересный исторический или научный факт и рассказать его мне при встрече.', reward: 15, isOneTime: false, isSpecial: false, diff: 1 },
-        { id: 111, title: '«Анализ ошибки»', desc: 'Вспомнить недавнюю неудачную ситуацию и написать 2 вывода: чему она научила и как поступить в следующий раз.', reward: 15, isOneTime: false, isSpecial: false, diff: 2 },
-        { id: 112, title: '«Оратор перед зеркалом»', desc: 'Потренироваться 3 минуты говорить перед зеркалом на любую тему уверенно и с хорошей дикцией.', reward: 25, isOneTime: false, isSpecial: false, diff: 2 },
-        { id: 113, title: '«3 "Почему"»', desc: 'Встретив незнакомый термин, событие или факт в интернете, не пролистнуть, а разобраться в нем и найти ответы.', reward: 30, isOneTime: false, isSpecial: false, diff: 2 }
+        { id: 111, title: '«Анализ ошибки»', desc: 'Вспомнить недавнюю неудачную ситуацию и написать 2 вывода: чему она научила и как поступить в следующий раз', reward: 15, isOneTime: false, isSpecial: false, diff: 2 },
+        { id: 112, title: '«Оратор перед зеркалом»', desc: 'Потренироваться 3 минуты говорить перед зеркалом на любую тему уверенно и с хорошей дикцией', reward: 25, isOneTime: false, isSpecial: false, diff: 2 },
+        { id: 113, title: '«3 "Почему"»', desc: 'Встретив незнакомый термин, событие или факт в интернете, не пролистнуть, а разобраться в нем и найти ответы', reward: 30, isOneTime: false, isSpecial: false, diff: 2 }
     ],
     store: [
         { id: 201, title: '«Массаж спины или ног (15 минут)»', desc: '', price: 100, isOneTime: false, isSpecial: false },
@@ -51,10 +51,16 @@ const DEFAULT_DB = {
 
 async function getDB() {
     try {
-        const data = await redis.get('quest_db');
-        return (!data) ? DEFAULT_DB : (typeof data === 'string' ? JSON.parse(data) : data);
+        let data = await redis.get('quest_db');
+        if (typeof data === 'string') data = JSON.parse(data);
+        
+        if (!data || data.version !== 3) {
+            const merged = { ...DEFAULT_DB, balance: data?.balance || 0, exp: data?.exp || 0, level: data?.level || 1, inventory: data?.inventory || [] };
+            await redis.set('quest_db', merged);
+            return merged;
+        }
+        return data;
     } catch (e) {
-        console.error('Ошибка Redis:', e);
         return DEFAULT_DB;
     }
 }
@@ -65,8 +71,7 @@ const bot = new Telegraf(BOT_TOKEN);
 app.use(express.json());
 
 async function notifyAdmin(text) {
-    try { await bot.telegram.sendMessage(ADMIN_ID, text); } 
-    catch (e) { console.error('Ошибка Telegram:', e); }
+    try { await bot.telegram.sendMessage(ADMIN_ID, text); } catch (e) {}
 }
 
 app.get('/api/data', async (req, res) => { res.json(await getDB()); });
@@ -135,7 +140,7 @@ app.post('/api/buy-item', async (req, res) => {
         db.inventory.push({ invId: Date.now(), title: item.title, desc: item.desc });
         if (item.isOneTime) db.store = db.store.filter(s => Number(s.id) !== Number(id));
         await saveDB(db);
-        await notifyAdmin(`🛍 Куплен товар!\n«${item.title}» отправлен в инвентарь!\n-${item.price} 🪙\nОстаток: ${db.balance} 🪙`);
+        await notifyAdmin(`🛍 Куплен товар!\n«${item.title}» отправлен в инвентарь!\nОстаток: ${db.balance} 🪙`);
         res.json({ success: true, db });
     } else {
         res.json({ success: false, message: 'Недостаточно монет!' });
@@ -149,7 +154,7 @@ app.post('/api/use-inventory', async (req, res) => {
     if (item) {
         db.inventory = db.inventory.filter(i => Number(i.invId) !== Number(invId));
         await saveDB(db);
-        await notifyAdmin(`🔥 ИСПОЛЬЗОВАН ПРЕДМЕТ ИЗ ИНВЕНТАРЯ 🔥\n«${item.title}»\nПора действовать!`);
+        await notifyAdmin(`🔥 ИСПОЛЬЗОВАН ПРЕДМЕТ ИЗ ИНВЕНТАРЯ 🔥\n«${item.title}»`);
     }
     res.json(db);
 });
@@ -165,67 +170,42 @@ app.get('/', (req, res) => {
     <style>
         :root { --bg: #121214; --card: #1e1e22; --accent: #6b4cff; --text: #f0f0f0; --sub: #8e8e93; 
                 --d1: #34c759; --d2: #ffcc00; --d3: #ff3b30; --d4: #bf5af2; }
-        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: var(--bg); color: var(--text); margin: 0; padding: 0; padding-bottom: 80px;}
+        body { font-family: 'Segoe UI', sans-serif; background: var(--bg); color: var(--text); margin: 0; padding-bottom: 80px;}
         * { box-sizing: border-box; }
         
         .rpg-header { background: linear-gradient(135deg, #2a2a32, #1a1a20); padding: 15px; text-align: center; border-bottom: 2px solid var(--accent); box-shadow: 0 4px 15px rgba(0,0,0,0.5);}
         .rpg-stats { display: flex; justify-content: space-around; font-size: 14px; font-weight: bold; margin-bottom: 8px;}
         .rpg-stats span { background: rgba(255,255,255,0.1); padding: 5px 12px; border-radius: 12px; }
-        .exp-bar-bg { width: 100%; height: 10px; background: #333; border-radius: 5px; overflow: hidden; position: relative;}
+        .exp-bar-bg { width: 100%; height: 10px; background: #333; border-radius: 5px; overflow: hidden;}
         .exp-bar-fill { height: 100%; background: linear-gradient(90deg, #6b4cff, #a288ff); width: 0%; transition: 0.3s; }
         .exp-text { font-size: 11px; color: #aaa; margin-top: 4px; }
 
-        .tabs-wrapper { 
-            display: grid; 
-            grid-template-columns: repeat(3, 1fr); 
-            gap: 6px; 
-            padding: 10px; 
-            background: var(--bg); 
-            position: sticky; 
-            top: 0; 
-            z-index: 10; 
-            border-bottom: 1px solid #333;
-        }
-        .tab-btn { 
-            padding: 8px 4px; 
-            text-align: center; 
-            background: var(--card); 
-            color: var(--sub); 
-            font-weight: bold; 
-            border-radius: 10px; 
-            border: 1px solid #333; 
-            font-size: 11px; 
-            transition: 0.2s;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-        }
+        .tabs-wrapper { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; padding: 8px; background: var(--bg); position: sticky; top: 0; z-index: 10; border-bottom: 1px solid #333;}
+        .tab-btn { padding: 10px 4px; text-align: center; background: var(--card); color: var(--sub); font-weight: bold; border-radius: 8px; border: 1px solid #333; font-size: 11px; display: flex; align-items: center; justify-content: center;}
         .tab-btn.active { background: var(--accent); color: #fff; border-color: var(--accent); }
 
         .container { padding: 15px; }
-        .card { background: var(--card); border-radius: 14px; padding: 15px; margin-bottom: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.2); }
-        h3 { margin: 0 0 10px 0; font-size: 16px; display: flex; justify-content: space-between; align-items: center;}
+        .card { background: var(--card); border-radius: 14px; padding: 15px; margin-bottom: 12px; }
+        h3 { margin: 0 0 10px 0; font-size: 15px; }
         
-        input, select, textarea { width: 100%; padding: 12px; margin-bottom: 10px; border-radius: 8px; border: 1px solid #444; background: #2a2a2e; color: white; font-family: inherit;}
-        button { width: 100%; padding: 12px; border-radius: 8px; border: none; font-weight: bold; font-size: 14px; color: white; cursor: pointer; transition: 0.2s; background: var(--accent); }
-        button:active { transform: scale(0.98); }
+        input, select, textarea { width: 100%; padding: 10px; margin-bottom: 10px; border-radius: 8px; border: 1px solid #444; background: #2a2a2e; color: white; font-family: inherit;}
+        button { width: 100%; padding: 12px; border-radius: 8px; border: none; font-weight: bold; font-size: 14px; color: white; cursor: pointer; background: var(--accent); }
         button.action { background: #34c759; }
         button.danger { background: #ff3b30; }
         button.small { width: auto; padding: 8px 12px; font-size: 12px; margin-left: 5px;}
 
-        .item-row { border: 1px solid #333; border-radius: 12px; margin-bottom: 10px; overflow: hidden; background: #1a1a1e; }
-        .item-header { padding: 12px; display: flex; justify-content: space-between; align-items: center; cursor: pointer; user-select: none; }
+        .item-row { border: 1px solid #333; border-radius: 12px; margin-bottom: 10px; background: #1a1a1e; }
+        .item-header { padding: 12px; display: flex; justify-content: space-between; align-items: center; }
         .item-title-block { display: flex; flex-direction: column; gap: 4px; flex-grow:1; }
         .item-title { font-weight: bold; font-size: 14px; display: flex; align-items: center; gap: 6px; line-height: 1.2;}
         .item-tags { display: flex; gap: 5px; font-size: 10px; flex-wrap: wrap; }
         .tag { padding: 2px 6px; border-radius: 6px; background: #333; color: #ccc; }
-        .diff-1 { color: var(--d1); } .diff-2 { color: var(--d2); } .diff-3 { color: var(--d3); } .diff-4 { color: var(--d4); text-shadow: 0 0 5px var(--d4);}
-        .item-val { font-weight: 900; font-size: 15px; color: #ffd60a; white-space: nowrap; margin-left: 10px;}
+        .diff-1 { color: var(--d1); } .diff-2 { color: var(--d2); } .diff-3 { color: var(--d3); } .diff-4 { color: var(--d4); }
+        .item-val { font-weight: 900; font-size: 15px; color: #ffd60a; margin-left: 10px;}
         
-        .item-body { padding: 0 12px 12px 12px; display: none; border-top: 1px dashed #333; margin-top: 5px; padding-top: 10px; color: #bbb; font-size: 13px; line-height: 1.4;}
+        .item-body { padding: 0 12px 12px 12px; display: none; border-top: 1px dashed #333; margin-top: 5px; padding-top: 10px; font-size: 13px; color: #bbb;}
         .item-body.open { display: block; }
         .item-actions { display: flex; gap: 8px; margin-top: 12px; }
-
         .admin-edit-form { background: #222; padding: 10px; border-radius: 8px; margin-top: 10px; border: 1px solid #444;}
         .checkbox-row { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; font-size: 14px; color: #ccc;}
         .checkbox-row input { width: 20px; height: 20px; margin: 0; }
@@ -260,8 +240,13 @@ app.get('/', (req, res) => {
 
         let g_db = { tasks: [], store: [], inventory: [], balance: 0, level: 1, exp: 0 };
         let currentTab = 'tasks';
-
         const diffColors = { 1: '🟢 Легко', 2: '🟡 Средне', 3: '🔴 Сложно', 4: '🟣 Ультра' };
+
+        function alertMsg(msg) { if(tg.showAlert) tg.showAlert(msg); else alert(msg); }
+        function confirmAction(msg, callback) {
+            if(tg.showConfirm) tg.showConfirm(msg, (res) => { if(res) callback(); });
+            else if(confirm(msg)) callback();
+        }
 
         async function init() {
             const res = await fetch('/api/data');
@@ -278,17 +263,17 @@ app.get('/', (req, res) => {
             document.getElementById('ui-exp-fill').style.width = fill + '%';
         }
 
-        function toggleDesc(id) {
+        window.toggleDesc = function(id) {
             const el = document.getElementById(id);
             if(el) el.classList.toggle('open');
         }
 
-        function toggleAdminDiff(selectId, targetId) {
-            const type = document.getElementById(selectId).value;
-            document.getElementById(targetId).style.display = (type === 'task') ? 'block' : 'none';
+        window.toggleAdminDiff = function() {
+            const type = document.getElementById('a-type').value;
+            document.getElementById('a-diff').style.display = (type === 'task') ? 'block' : 'none';
         }
 
-        function showTab(tab) {
+        window.showTab = function(tab) {
             currentTab = tab;
             document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
             event.currentTarget?.classList?.add('active');
@@ -313,7 +298,7 @@ app.get('/', (req, res) => {
                 html += \`
                     <div class="card">
                         <h3>🛠 Добавить Квест/Товар</h3>
-                        <select id="a-type" onchange="toggleAdminDiff('a-type', 'a-diff')">
+                        <select id="a-type" onchange="toggleAdminDiff()">
                             <option value="task">Квест</option>
                             <option value="store">Товар</option>
                         </select>
@@ -321,10 +306,10 @@ app.get('/', (req, res) => {
                         <textarea id="a-desc" placeholder="Описание" rows="2"></textarea>
                         <input id="a-val" type="number" placeholder="Награда / Цена">
                         <select id="a-diff">
-                            <option value="1">Сложность: Легко (1)</option>
-                            <option value="2" selected>Сложность: Средне (2)</option>
-                            <option value="3">Сложность: Сложно (3)</option>
-                            <option value="4">Сложность: Ультра (4)</option>
+                            <option value="1">Сложность: Легко</option>
+                            <option value="2" selected>Сложность: Средне</option>
+                            <option value="3">Сложность: Сложно</option>
+                            <option value="4">Сложность: Ультра</option>
                         </select>
                         <label class="checkbox-row"><input type="checkbox" id="a-onetime"> Одноразовое</label>
                         <label class="checkbox-row"><input type="checkbox" id="a-special"> Во вкладку "Особое"</label>
@@ -332,13 +317,13 @@ app.get('/', (req, res) => {
                     </div>
                     <div class="card">
                         <h3>📊 Статистика Игрока</h3>
-                        <label>Монеты (Баланс):</label>
+                        <label>Монеты:</label>
                         <input id="st-bal" type="number" value="\${g_db.balance}">
                         <label>Уровень:</label>
                         <input id="st-lvl" type="number" value="\${g_db.level}">
-                        <label>Общий Опыт:</label>
+                        <label>Опыт:</label>
                         <input id="st-exp" type="number" value="\${g_db.exp}">
-                        <button class="secondary" onclick="updateStats()">Сохранить статы</button>
+                        <button class="action" onclick="updateStats()">Сохранить статы</button>
                     </div>
                 \`;
             }
@@ -349,13 +334,9 @@ app.get('/', (req, res) => {
             const isTask = type === 'task';
             const isStore = type === 'store';
             const isInv = type === 'inventory';
-            
             const uid = type + '-' + (isInv ? item.invId : item.id);
             
-            let valLabel = '';
-            if (isTask) valLabel = '+' + item.reward + ' 🪙';
-            else if (isStore) valLabel = '-' + item.price + ' 🪙';
-
+            let valLabel = isTask ? '+' + item.reward : (isStore ? '-' + item.price : '');
             let diffIcon = isTask ? \`<span class="diff-\${item.diff}">●</span> \` : '';
             
             let tagsHtml = '';
@@ -366,24 +347,27 @@ app.get('/', (req, res) => {
 
             let actions = '';
             if (!isAdmin) {
-                if (isTask) actions = \`<button class="action" onclick="completeTask(\${item.id})">Сделано</button>\`;
-                else if (isStore) actions = \`<button class="action" onclick="buyItem(\${item.id})">Купить</button>\`;
-                else if (isInv) actions = \`<button class="action" onclick="useInv(\${item.invId})">Использовать</button>\`;
+                if (isTask) actions = \`<button class="action" onclick="event.stopPropagation(); completeTask(\${item.id})">Сделано</button>\`;
+                else if (isStore) actions = \`<button class="action" onclick="event.stopPropagation(); buyItem(\${item.id})">Купить</button>\`;
+                else if (isInv) actions = \`<button class="action" onclick="event.stopPropagation(); useInv(\${item.invId})">Использовать</button>\`;
             } else {
                 if (isInv) {
-                    actions = \`<button class="danger small" onclick="delItem('inventory', \${item.invId})">Удалить из инвентаря</button>\`;
+                    actions = \`<button class="danger small" onclick="event.stopPropagation(); delItem('inventory', \${item.invId})">Удалить из инвентаря</button>\`;
                 } else {
                     actions = \`
-                        <button class="small" onclick="toggleEdit('\${uid}')">Редактировать</button>
-                        <button class="danger small" onclick="delItem('\${type}', \${item.id})">Удалить</button>
+                        <button class="small" onclick="event.stopPropagation(); toggleDesc('edit-\${uid}')">Редактировать</button>
+                        <button class="danger small" onclick="event.stopPropagation(); delItem('\${type}', \${item.id})">Удалить</button>
                     \`;
                 }
             }
 
+            const safeTitle = item.title.replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+            const safeDesc = (item.desc || '').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+
             let editForm = (isAdmin && !isInv) ? \`
-                <div class="admin-edit-form" id="edit-\${uid}" style="display:none;">
-                    <input id="et-\${uid}" value='\${item.title.replace(/'/g, "&#39;")}'>
-                    <textarea id="ed-\${uid}" rows="2">\${(item.desc || '').replace(/'/g, "&#39;")}</textarea>
+                <div class="admin-edit-form item-body" id="edit-\${uid}">
+                    <input id="et-\${uid}" value="\${safeTitle}">
+                    <textarea id="ed-\${uid}" rows="2">\${safeDesc}</textarea>
                     <input id="ev-\${uid}" type="number" value="\${isTask ? item.reward : item.price}">
                     <select id="edf-\${uid}" style="display:\${isTask ? 'block' : 'none'}">
                         <option value="1" \${item.diff==1?'selected':''}>Легко</option>
@@ -393,7 +377,7 @@ app.get('/', (req, res) => {
                     </select>
                     <label class="checkbox-row"><input type="checkbox" id="eo-\${uid}" \${item.isOneTime?'checked':''}> Одноразовое</label>
                     <label class="checkbox-row"><input type="checkbox" id="es-\${uid}" \${item.isSpecial?'checked':''}> Особое (🌟/💎)</label>
-                    <button onclick="saveItem('\${type}', \${item.id})">Сохранить</button>
+                    <button onclick="saveItem('\${type}', \${item.id})">Сохранить изменения</button>
                 </div>
             \` : '';
 
@@ -404,27 +388,27 @@ app.get('/', (req, res) => {
                             <div class="item-title">\${diffIcon}\${item.title}</div>
                             \${tagsHtml ? \`<div class="item-tags">\${tagsHtml}</div>\` : ''}
                         </div>
-                        \${valLabel ? \`<div class="item-val">\${valLabel}</div>\` : ''}
+                        \${valLabel ? \`<div class="item-val">\${valLabel} 🪙</div>\` : ''}
                     </div>
                     <div class="item-body" id="desc-\${uid}">
                         \${item.desc || (isInv ? 'Без описания' : '')}
                         <div class="item-actions">\${actions}</div>
-                        \${editForm}
                     </div>
+                    \${editForm}
                 </div>
             \`;
         }
 
-        async function updateStats() {
+        window.updateStats = async function() {
             const b = document.getElementById('st-bal').value;
             const l = document.getElementById('st-lvl').value;
             const e = document.getElementById('st-exp').value;
             const res = await fetch('/api/update-stats', { method: 'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({balance:b, level:l, exp:e}) });
             g_db = await res.json();
-            updateHeader(); alert('Сохранено!');
+            updateHeader(); alertMsg('Статистика сохранена!');
         }
 
-        async function saveItem(type, id = null) {
+        window.saveItem = async function(type, id = null) {
             let data = {};
             if (type === 'new') {
                 data = {
@@ -439,7 +423,7 @@ app.get('/', (req, res) => {
             } else {
                 const uid = type + '-' + id;
                 data = {
-                    type: type, id: id,
+                    type, id,
                     title: document.getElementById('et-' + uid).value,
                     desc: document.getElementById('ed-' + uid).value,
                     value: document.getElementById('ev-' + uid).value,
@@ -448,57 +432,55 @@ app.get('/', (req, res) => {
                     isSpecial: document.getElementById('es-' + uid).checked
                 };
             }
-            
-            if(!data.title || !data.value) return alert('Введите название и значение!');
+            if(!data.title || !data.value) return alertMsg('Введи название и значение!');
             
             const res = await fetch('/api/save-item', { method: 'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(data) });
             g_db = await res.json();
-            if (type === 'new') {
-                document.getElementById('a-title').value = '';
-                document.getElementById('a-desc').value = '';
-                document.getElementById('a-val').value = '';
-                alert('Успешно добавлено!');
-            }
             showTab(currentTab);
         }
 
-        async function delItem(type, id) {
-            if(!confirm('Точно удалить?')) return;
-            const res = await fetch('/api/delete-item', { method: 'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({type, id}) });
-            g_db = await res.json();
-            showTab(currentTab);
+        window.delItem = function(type, id) {
+            confirmAction('Точно удалить?', async () => {
+                const res = await fetch('/api/delete-item', { method: 'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({type, id}) });
+                g_db = await res.json();
+                showTab(currentTab);
+            });
         }
 
-        async function completeTask(id) {
+        window.completeTask = async function(id) {
             const res = await fetch('/api/complete-task', { method: 'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({id}) });
             g_db = await res.json();
             updateHeader(); showTab(currentTab);
+            alertMsg('Задание выполнено! Награда начислена.');
         }
 
-        async function buyItem(id) {
+        window.buyItem = async function(id) {
             const res = await fetch('/api/buy-item', { method: 'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({id}) });
             const data = await res.json();
-            if(!data.success) { alert(data.message); return; }
+            if(!data.success) return alertMsg(data.message);
             g_db = data.db;
-            updateHeader(); showTab(currentTab); alert('Предмет добавлен в Инвентарь!');
+            updateHeader(); showTab(currentTab);
+            alertMsg('Товар куплен и добавлен в инвентарь!');
         }
 
-        async function useInv(invId) {
-            if(!confirm('Использовать предмет прямо сейчас?')) return;
-            const res = await fetch('/api/use-inventory', { method: 'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({invId}) });
-            g_db = await res.json();
-            showTab(currentTab); alert('Запрос отправлен!');
+        window.useInv = function(invId) {
+            confirmAction('Использовать предмет прямо сейчас?', async () => {
+                const res = await fetch('/api/use-inventory', { method: 'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({invId}) });
+                g_db = await res.json();
+                showTab(currentTab);
+                alertMsg('Предмет активирован!');
+            });
         }
 
         init();
     </script>
 </body>
 </html>
-`);
+    `);
 });
 
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log('Server running on port ' + PORT));
+app.listen(PORT, () => {});
 
-bot.start((ctx) => ctx.reply('Привет! Нажми на кнопку меню, чтобы открыть квесты'));
+bot.start((ctx) => ctx.reply('Привет! Нажми на кнопку меню, чтобы открыть приложение'));
 bot.launch();
