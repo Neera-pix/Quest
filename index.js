@@ -14,7 +14,7 @@ const redis = new Redis({
 const EXP_MAP = { 1: 10, 2: 25, 3: 50, 4: 100 };
 
 const DEFAULT_DB = {
-    version: 4,
+    version: 5, // Версия 5 - удален инвентарь
     tasks: [
         { id: '101', title: '«Без паразитов»', desc: 'Провести целый день, не используя в речи слова-паразиты («типа», «как бы», «короче», «ну»)', reward: 30, isOneTime: false, isSpecial: false, diff: 2 },
         { id: '102', title: '«Слово дня»', desc: 'Узнать значение редкого/красивого слова (например, эрудиция, эмпатия, контекст, лаконичность) и уместно использовать его в диалоге со мной 3 раза за день.', reward: 25, isOneTime: false, isSpecial: false, diff: 1 },
@@ -43,7 +43,6 @@ const DEFAULT_DB = {
         { id: '210', title: 'Возможность полностью контролировать маршрут прогулки и мест досуга/кафе', desc: '', price: 550, isOneTime: false, isSpecial: false },
         { id: '211', title: 'Отключение обидок и выебонов от меня на 24 часа', desc: '', price: 400, isOneTime: false, isSpecial: false }
     ],
-    inventory: [],
     balance: 0,
     level: 1,
     exp: 0
@@ -58,8 +57,8 @@ async function getDB() {
         let data = await redis.get('quest_db');
         if (typeof data === 'string') data = JSON.parse(data);
         
-        if (!data || data.version !== 4) {
-            const merged = { ...DEFAULT_DB, balance: data?.balance || 0, exp: data?.exp || 0, inventory: data?.inventory || [] };
+        if (!data || data.version !== 5) {
+            const merged = { ...DEFAULT_DB, balance: data?.balance || 0, exp: data?.exp || 0 };
             merged.level = calcLevel(merged.exp);
             await redis.set('quest_db', merged);
             return merged;
@@ -75,7 +74,7 @@ async function saveDB(db) { await redis.set('quest_db', db); }
 const bot = new Telegraf(BOT_TOKEN);
 app.use(express.json());
 
-// Отправка уведомлений в фоне без блокировки
+// Отправка уведомлений без блокировки интерфейса
 function notifyAdmin(text) {
     bot.telegram.sendMessage(ADMIN_ID, text).catch(() => {});
 }
@@ -121,7 +120,6 @@ app.post('/api/delete-item', async (req, res) => {
     const db = await getDB();
     if (type === 'task') db.tasks = db.tasks.filter(t => String(t.id) !== String(id));
     else if (type === 'store') db.store = db.store.filter(s => String(s.id) !== String(id));
-    else if (type === 'inventory') db.inventory = db.inventory.filter(i => String(i.invId) !== String(id));
     await saveDB(db);
     res.json(db);
 });
@@ -155,34 +153,17 @@ app.post('/api/buy-item', async (req, res) => {
         const item = db.store[itemIndex];
         if (db.balance >= item.price) {
             db.balance -= item.price;
-            // Уникальный ID для инвентаря
-            const invId = Date.now().toString() + Math.floor(Math.random() * 1000);
-            db.inventory.push({ invId, title: item.title, desc: item.desc });
             
             if (item.isOneTime) db.store.splice(itemIndex, 1);
             
             await saveDB(db);
-            notifyAdmin(`🛍 Куплен товар!\n«${item.title}» отправлен в инвентарь!\nОстаток: ${db.balance} 🪙`);
+            notifyAdmin(`🛍 Использован товар (Куплено)!\n«${item.title}»\nОстаток баланса: ${db.balance} 🪙`);
             return res.json({ success: true, db });
         } else {
             return res.json({ success: false, message: 'Недостаточно монет!' });
         }
     }
     res.json({ success: false, message: 'Товар не найден!' });
-});
-
-app.post('/api/use-inventory', async (req, res) => {
-    const { invId } = req.body;
-    const db = await getDB();
-    const itemIndex = db.inventory.findIndex(i => String(i.invId) === String(invId));
-    
-    if (itemIndex > -1) {
-        const item = db.inventory[itemIndex];
-        db.inventory.splice(itemIndex, 1);
-        await saveDB(db);
-        notifyAdmin(`🔥 ИСПОЛЬЗОВАН ПРЕДМЕТ ИЗ ИНВЕНТАРЯ 🔥\n«${item.title}»`);
-    }
-    res.json(db);
 });
 
 app.get('/', (req, res) => {
@@ -250,7 +231,6 @@ app.get('/', (req, res) => {
     <div class="tabs-wrapper">
         <div class="tab-btn active" onclick="showTab('tasks')">📋 Квесты</div>
         <div class="tab-btn" onclick="showTab('store')">🎁 Магазин</div>
-        <div class="tab-btn" onclick="showTab('inv')">🎒 Инвентарь</div>
         <div class="tab-btn" onclick="showTab('tasks-sp')">🌟 Ос. Квесты</div>
         <div class="tab-btn" onclick="showTab('store-sp')">💎 Ос. Товары</div>
         <div class="tab-btn admin-only" onclick="showTab('admin')" style="display:none;">⚙️ Админка</div>
@@ -264,11 +244,11 @@ app.get('/', (req, res) => {
         const isAdmin = ((tg.initDataUnsafe?.user?.id || 0) == ${ADMIN_ID});
         if(isAdmin) document.querySelector('.admin-only').style.display = 'flex';
 
-        let g_db = { tasks: [], store: [], inventory: [], balance: 0, level: 1, exp: 0 };
+        let g_db = { tasks: [], store: [], balance: 0, level: 1, exp: 0 };
         let currentTab = 'tasks';
         const diffColors = { 1: '🟢 Легко', 2: '🟡 Средне', 3: '🔴 Сложно', 4: '🟣 Ультра' };
 
-        // Защита от поломки HTML из-за кавычек
+        // Защита кавычек
         function escapeHtml(str) {
             if (!str) return '';
             return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
@@ -326,9 +306,6 @@ app.get('/', (req, res) => {
                 const list = g_db.store.filter(s => s.isSpecial === isSp);
                 html += list.map(s => renderItem(s, 'store')).join('') || '<p>Тут пока пусто.</p>';
             }
-            else if (tab === 'inv') {
-                html += g_db.inventory.map(i => renderItem(i, 'inventory')).join('') || '<p>Инвентарь пуст.</p>';
-            }
             else if (tab === 'admin' && isAdmin) {
                 html += \`
                     <div class="card">
@@ -366,40 +343,33 @@ app.get('/', (req, res) => {
         function renderItem(item, type) {
             const isTask = type === 'task';
             const isStore = type === 'store';
-            const isInv = type === 'inventory';
-            const uid = type + '-' + (isInv ? item.invId : item.id);
+            const uid = type + '-' + item.id;
             
-            let valLabel = isTask ? '+' + item.reward : (isStore ? '-' + item.price : '');
+            let valLabel = isTask ? '+' + item.reward : '-' + item.price;
             let diffIcon = isTask ? \`<span class="diff-\${item.diff}">●</span> \` : '';
             
             let tagsHtml = '';
-            if (!isInv) {
-                if (isTask) tagsHtml += \`<span class="tag">\${diffColors[item.diff].split(' ')[1]}</span>\`;
-                tagsHtml += item.isOneTime ? '<span class="tag">1 раз</span>' : '<span class="tag">Многоразово</span>';
-            }
+            if (isTask) tagsHtml += \`<span class="tag">\${diffColors[item.diff].split(' ')[1]}</span>\`;
+            tagsHtml += item.isOneTime ? '<span class="tag">1 раз</span>' : '<span class="tag">Многоразово</span>';
+            
 
-            const safeId = escapeHtml(isInv ? item.invId : item.id);
+            const safeId = escapeHtml(item.id);
 
             let actions = '';
             if (!isAdmin) {
                 if (isTask) actions = \`<button class="action" onclick="event.stopPropagation(); completeTask('\${safeId}')">Сделано</button>\`;
                 else if (isStore) actions = \`<button class="action" onclick="event.stopPropagation(); buyItem('\${safeId}')">Купить</button>\`;
-                else if (isInv) actions = \`<button class="action" onclick="event.stopPropagation(); useInv('\${safeId}')">Использовать</button>\`;
             } else {
-                if (isInv) {
-                    actions = \`<button class="danger small" onclick="event.stopPropagation(); delItem('inventory', '\${safeId}')">Удалить из инвентаря</button>\`;
-                } else {
-                    actions = \`
-                        <button class="small" onclick="event.stopPropagation(); toggleDesc('edit-\${uid}')">Редактировать</button>
-                        <button class="danger small" onclick="event.stopPropagation(); delItem('\${type}', '\${safeId}')">Удалить</button>
-                    \`;
-                }
+                actions = \`
+                    <button class="small" onclick="event.stopPropagation(); toggleDesc('edit-\${uid}')">Редактировать</button>
+                    <button class="danger small" onclick="event.stopPropagation(); delItem('\${type}', '\${safeId}')">Удалить</button>
+                \`;
             }
 
             const safeTitle = escapeHtml(item.title);
             const safeDesc = escapeHtml(item.desc);
 
-            let editForm = (isAdmin && !isInv) ? \`
+            let editForm = isAdmin ? \`
                 <div class="admin-edit-form item-body" id="edit-\${uid}">
                     <input id="et-\${uid}" value="\${safeTitle}">
                     <textarea id="ed-\${uid}" rows="2">\${safeDesc}</textarea>
@@ -421,12 +391,12 @@ app.get('/', (req, res) => {
                     <div class="item-header" onclick="toggleDesc('desc-\${uid}')">
                         <div class="item-title-block">
                             <div class="item-title">\${diffIcon}\${safeTitle}</div>
-                            \${tagsHtml ? \`<div class="item-tags">\${tagsHtml}</div>\` : ''}
+                            <div class="item-tags">\${tagsHtml}</div>
                         </div>
-                        \${valLabel ? \`<div class="item-val">\${valLabel} 🪙</div>\` : ''}
+                        <div class="item-val">\${valLabel} 🪙</div>
                     </div>
                     <div class="item-body" id="desc-\${uid}">
-                        \${safeDesc || (isInv ? 'Без описания' : '')}
+                        \${safeDesc}
                         <div class="item-actions">\${actions}</div>
                     </div>
                     \${editForm}
@@ -479,7 +449,6 @@ app.get('/', (req, res) => {
                 // Optimistic UI update (мгновенное скрытие элемента)
                 if (type === 'task') g_db.tasks = g_db.tasks.filter(t => String(t.id) !== String(id));
                 else if (type === 'store') g_db.store = g_db.store.filter(s => String(s.id) !== String(id));
-                else if (type === 'inventory') g_db.inventory = g_db.inventory.filter(i => String(i.invId) !== String(id));
                 showTab(currentTab);
 
                 const res = await fetch('/api/delete-item', { method: 'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({type, id}) });
@@ -505,29 +474,29 @@ app.get('/', (req, res) => {
         }
 
         window.buyItem = async function(id) {
-            if(tg.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
-            
-            const res = await fetch('/api/buy-item', { method: 'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({id}) });
-            const data = await res.json();
-            if(!data.success) return alertMsg(data.message);
-            
-            g_db = data.db;
-            updateHeader(); showTab(currentTab);
-            alertMsg('Товар куплен и добавлен в инвентарь!');
-        }
-
-        window.useInv = function(invId) {
-            confirmAction('Использовать предмет прямо сейчас?', async () => {
+            confirmAction('Точно использовать (купить) этот товар?', async () => {
                 if(tg.HapticFeedback) tg.HapticFeedback.impactOccurred('heavy');
                 
-                // Optimistic UI (прячем предмет мгновенно)
-                g_db.inventory = g_db.inventory.filter(i => String(i.invId) !== String(invId));
-                showTab(currentTab);
+                // Мгновенно убираем, если одноразовое и хватает денег
+                const item = g_db.store.find(s => String(s.id) === String(id));
+                if (item && g_db.balance >= item.price && item.isOneTime) {
+                    g_db.store = g_db.store.filter(s => String(s.id) !== String(id));
+                    showTab(currentTab);
+                }
+
+                const res = await fetch('/api/buy-item', { method: 'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({id}) });
+                const data = await res.json();
+                if(!data.success) {
+                    // Если денег не хватило, возвращаем обратно с сервера актуальную базу
+                    const fallbackRes = await fetch('/api/data');
+                    g_db = await fallbackRes.json();
+                    showTab(currentTab);
+                    return alertMsg(data.message);
+                }
                 
-                const res = await fetch('/api/use-inventory', { method: 'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({invId}) });
-                g_db = await res.json();
-                showTab(currentTab);
-                alertMsg('Предмет активирован!');
+                g_db = data.db;
+                updateHeader(); showTab(currentTab);
+                alertMsg('Товар успешно использован! Я получил уведомление.');
             });
         }
 
