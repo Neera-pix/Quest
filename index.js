@@ -14,34 +14,34 @@ const redis = new Redis({
 const EXP_MAP = { 1: 10, 2: 25, 3: 50, 4: 100 };
 
 const DEFAULT_DB = {
-    version: 4, // Версия 4 - принудительно обновит квесты
+    version: 4,
     tasks: [
-        { id: 101, title: '«Без паразитов»', desc: 'Провести целый день, не используя в речи слова-паразиты («типа», «как бы», «короче», «ну»)', reward: 30, isOneTime: false, isSpecial: false, diff: 2 },
-        { id: 102, title: '«Слово дня»', desc: 'Узнать значение редкого/красивого слова (например, эрудиция, эмпатия, контекст, лаконичность) и уместно использовать его в диалоге со мной 3 раза за день.', reward: 25, isOneTime: false, isSpecial: false, diff: 1 },
-        { id: 103, title: '«Мастер пересказа»', desc: 'Посмотреть увлекательное видео или прочитать статью и за 2 минуты эмоционально и красиво пересказать мне суть', reward: 30, isOneTime: false, isSpecial: false, diff: 2 },
-        { id: 104, title: '«Никаких матов»', desc: 'Продержаться 24 часа без единого матерного слова (выражать эмоции только богатым литературным языком)', reward: 60, isOneTime: true, isSpecial: false, diff: 3 },
-        { id: 105, title: '«Голосовое эссе»', desc: 'Записать мне аудиосообщение на 2-3 минуты с размышлением на любую тему без пауз, мычания и заминок.', reward: 35, isOneTime: false, isSpecial: false, diff: 2 },
-        { id: 106, title: '«Адвокат дьявола»', desc: 'Выбрать любую спорную тему и аргументированно защитить точку зрения, с которой сам изначально не согласен', reward: 35, isOneTime: false, isSpecial: false, diff: 3 },
-        { id: 107, title: 'Прочитать книгу (около 500 страниц)', desc: '', reward: 650, isOneTime: false, isSpecial: false, diff: 4 },
-        { id: 108, title: '«Логическая ловушка»', desc: 'Узнать, что такое 2 любых логических когнитивных искажения (например, «ошибка выжившего» или «эффект Даннинга-Крюгера») и объяснить их мне простыми словами.', reward: 35, isOneTime: false, isSpecial: false, diff: 2 },
-        { id: 109, title: '«Без гаджетов»', desc: 'Заниматься саморазвитием, чтением или размышлениями 2 часа без телефона и соцсетей', reward: 45, isOneTime: false, isSpecial: false, diff: 3 },
-        { id: 110, title: '«Факт дня»', desc: 'Узнать 1 интересный исторический или научный факт и рассказать его мне при встрече.', reward: 15, isOneTime: false, isSpecial: false, diff: 1 },
-        { id: 111, title: '«Анализ ошибки»', desc: 'Вспомнить недавнюю неудачную ситуацию и написать 2 вывода: чему она научила и как поступить в следующий раз', reward: 15, isOneTime: false, isSpecial: false, diff: 2 },
-        { id: 112, title: '«Оратор перед зеркалом»', desc: 'Потренироваться 3 минуты говорить перед зеркалом на любую тему уверенно и с хорошей дикцией', reward: 25, isOneTime: false, isSpecial: false, diff: 2 },
-        { id: 113, title: '«3 "Почему"»', desc: 'Встретив незнакомый термин, событие или факт в интернете, не пролистнуть, а разобраться в нем и найти ответы', reward: 30, isOneTime: false, isSpecial: false, diff: 2 }
+        { id: '101', title: '«Без паразитов»', desc: 'Провести целый день, не используя в речи слова-паразиты («типа», «как бы», «короче», «ну»)', reward: 30, isOneTime: false, isSpecial: false, diff: 2 },
+        { id: '102', title: '«Слово дня»', desc: 'Узнать значение редкого/красивого слова (например, эрудиция, эмпатия, контекст, лаконичность) и уместно использовать его в диалоге со мной 3 раза за день.', reward: 25, isOneTime: false, isSpecial: false, diff: 1 },
+        { id: '103', title: '«Мастер пересказа»', desc: 'Посмотреть увлекательное видео или прочитать статью и за 2 минуты эмоционально и красиво пересказать мне суть', reward: 30, isOneTime: false, isSpecial: false, diff: 2 },
+        { id: '104', title: '«Никаких матов»', desc: 'Продержаться 24 часа без единого матерного слова (выражать эмоции только богатым литературным языком)', reward: 60, isOneTime: true, isSpecial: false, diff: 3 },
+        { id: '105', title: '«Голосовое эссе»', desc: 'Записать мне аудиосообщение на 2-3 минуты с размышлением на любую тему без пауз, мычания и заминок.', reward: 35, isOneTime: false, isSpecial: false, diff: 2 },
+        { id: '106', title: '«Адвокат дьявола»', desc: 'Выбрать любую спорную тему и аргументированно защитить точку зрения, с которой сам изначально не согласен', reward: 35, isOneTime: false, isSpecial: false, diff: 3 },
+        { id: '107', title: 'Прочитать книгу (около 500 страниц)', desc: '', reward: 650, isOneTime: false, isSpecial: false, diff: 4 },
+        { id: '108', title: '«Логическая ловушка»', desc: 'Узнать, что такое 2 любых логических когнитивных искажения (например, «ошибка выжившего» или «эффект Даннинга-Крюгера») и объяснить их мне простыми словами.', reward: 35, isOneTime: false, isSpecial: false, diff: 2 },
+        { id: '109', title: '«Без гаджетов»', desc: 'Заниматься саморазвитием, чтением или размышлениями 2 часа без телефона и соцсетей', reward: 45, isOneTime: false, isSpecial: false, diff: 3 },
+        { id: '110', title: '«Факт дня»', desc: 'Узнать 1 интересный исторический или научный факт и рассказать его мне при встрече.', reward: 15, isOneTime: false, isSpecial: false, diff: 1 },
+        { id: '111', title: '«Анализ ошибки»', desc: 'Вспомнить недавнюю неудачную ситуацию и написать 2 вывода: чему она научила и как поступить в следующий раз', reward: 15, isOneTime: false, isSpecial: false, diff: 2 },
+        { id: '112', title: '«Оратор перед зеркалом»', desc: 'Потренироваться 3 минуты говорить перед зеркалом на любую тему уверенно и с хорошей дикцией', reward: 25, isOneTime: false, isSpecial: false, diff: 2 },
+        { id: '113', title: '«3 "Почему"»', desc: 'Встретив незнакомый термин, событие или факт в интернете, не пролистнуть, а разобраться в нем и найти ответы', reward: 30, isOneTime: false, isSpecial: false, diff: 2 }
     ],
     store: [
-        { id: 201, title: '«Массаж спины или ног (15 минут)»', desc: '', price: 100, isOneTime: false, isSpecial: false },
-        { id: 202, title: '«Вкусняшка на выбор вне плана»', desc: '', price: 90, isOneTime: false, isSpecial: false },
-        { id: 203, title: '«Любое желание на выбор (в пределах разумного)»', desc: '', price: 1000, isOneTime: false, isSpecial: false },
-        { id: 204, title: '«Вход без очереди (выбор места или права решения в споре)»', desc: '', price: 400, isOneTime: false, isSpecial: false },
-        { id: 205, title: '«Право вето»', desc: '(Заблокировать одну мою идею или предложение на сегодня)', price: 200, isOneTime: true, isSpecial: false },
-        { id: 206, title: '«Секретный подарок от меня»', desc: '', price: 550, isOneTime: true, isSpecial: false },
-        { id: 207, title: '«Супер-купон: День абсолютного релакса»', desc: '', price: 700, isOneTime: true, isSpecial: false },
-        { id: 208, title: 'Задонатить 150 рублей', desc: '', price: 350, isOneTime: false, isSpecial: false },
-        { id: 209, title: 'Прокатиться на самокатах', desc: '', price: 400, isOneTime: false, isSpecial: false },
-        { id: 210, title: 'Возможность полностью контролировать маршрут прогулки и мест досуга/кафе', desc: '', price: 550, isOneTime: false, isSpecial: false },
-        { id: 211, title: 'Отключение обидок и выебонов от меня на 24 часа', desc: '', price: 400, isOneTime: false, isSpecial: false }
+        { id: '201', title: '«Массаж спины или ног (15 минут)»', desc: '', price: 100, isOneTime: false, isSpecial: false },
+        { id: '202', title: '«Вкусняшка на выбор вне плана»', desc: '', price: 90, isOneTime: false, isSpecial: false },
+        { id: '203', title: '«Любое желание на выбор (в пределах разумного)»', desc: '', price: 1000, isOneTime: false, isSpecial: false },
+        { id: '204', title: '«Вход без очереди (выбор места или права решения в споре)»', desc: '', price: 400, isOneTime: false, isSpecial: false },
+        { id: '205', title: '«Право вето»', desc: '(Заблокировать одну мою идею или предложение на сегодня)', price: 200, isOneTime: true, isSpecial: false },
+        { id: '206', title: '«Секретный подарок от меня»', desc: '', price: 550, isOneTime: true, isSpecial: false },
+        { id: '207', title: '«Супер-купон: День абсолютного релакса»', desc: '', price: 700, isOneTime: true, isSpecial: false },
+        { id: '208', title: 'Задонатить 150 рублей', desc: '', price: 350, isOneTime: false, isSpecial: false },
+        { id: '209', title: 'Прокатиться на самокатах', desc: '', price: 400, isOneTime: false, isSpecial: false },
+        { id: '210', title: 'Возможность полностью контролировать маршрут прогулки и мест досуга/кафе', desc: '', price: 550, isOneTime: false, isSpecial: false },
+        { id: '211', title: 'Отключение обидок и выебонов от меня на 24 часа', desc: '', price: 400, isOneTime: false, isSpecial: false }
     ],
     inventory: [],
     balance: 0,
@@ -75,7 +75,7 @@ async function saveDB(db) { await redis.set('quest_db', db); }
 const bot = new Telegraf(BOT_TOKEN);
 app.use(express.json());
 
-// Отправка в фоне, чтобы интерфейс не зависал!
+// Отправка уведомлений в фоне без блокировки
 function notifyAdmin(text) {
     bot.telegram.sendMessage(ADMIN_ID, text).catch(() => {});
 }
@@ -100,13 +100,14 @@ app.post('/api/save-item', async (req, res) => {
     const db = await getDB();
     const list = type === 'task' ? db.tasks : db.store;
     
-    let item = list.find(i => Number(i.id) === Number(id));
-    if (item) {
+    let itemIndex = list.findIndex(i => String(i.id) === String(id));
+    if (itemIndex > -1) {
+        let item = list[itemIndex];
         item.title = title; item.desc = desc; item.isOneTime = isOneTime; item.isSpecial = isSpecial;
         if (type === 'task') { item.reward = Number(value); item.diff = Number(diff); } 
         else { item.price = Number(value); }
     } else {
-        const newItem = { id: Date.now(), title, desc, isOneTime, isSpecial };
+        const newItem = { id: Date.now().toString(), title, desc, isOneTime, isSpecial };
         if (type === 'task') { newItem.reward = Number(value); newItem.diff = Number(diff); } 
         else { newItem.price = Number(value); }
         list.push(newItem);
@@ -118,9 +119,9 @@ app.post('/api/save-item', async (req, res) => {
 app.post('/api/delete-item', async (req, res) => {
     const { type, id } = req.body;
     const db = await getDB();
-    if (type === 'task') db.tasks = db.tasks.filter(t => Number(t.id) !== Number(id));
-    else if (type === 'store') db.store = db.store.filter(s => Number(s.id) !== Number(id));
-    else if (type === 'inventory') db.inventory = db.inventory.filter(i => Number(i.invId) !== Number(id));
+    if (type === 'task') db.tasks = db.tasks.filter(t => String(t.id) !== String(id));
+    else if (type === 'store') db.store = db.store.filter(s => String(s.id) !== String(id));
+    else if (type === 'inventory') db.inventory = db.inventory.filter(i => String(i.invId) !== String(id));
     await saveDB(db);
     res.json(db);
 });
@@ -128,13 +129,17 @@ app.post('/api/delete-item', async (req, res) => {
 app.post('/api/complete-task', async (req, res) => {
     const { id } = req.body;
     const db = await getDB();
-    const task = db.tasks.find(t => Number(t.id) === Number(id));
-    if (task) {
+    const taskIndex = db.tasks.findIndex(t => String(t.id) === String(id));
+    
+    if (taskIndex > -1) {
+        const task = db.tasks[taskIndex];
         const gainedExp = EXP_MAP[task.diff] || 10;
         db.balance += task.reward;
         db.exp += gainedExp;
         db.level = calcLevel(db.exp);
-        if (task.isOneTime) db.tasks = db.tasks.filter(t => Number(t.id) !== Number(id));
+        
+        if (task.isOneTime) db.tasks.splice(taskIndex, 1);
+        
         await saveDB(db);
         notifyAdmin(`✅ Задание выполнено!\n«${task.title}»\n+${task.reward} 🪙 | +${gainedExp} EXP\nТекущий баланс: ${db.balance} 🪙\nТекущий уровень: ${db.level}`);
     }
@@ -144,25 +149,36 @@ app.post('/api/complete-task', async (req, res) => {
 app.post('/api/buy-item', async (req, res) => {
     const { id } = req.body;
     const db = await getDB();
-    const item = db.store.find(s => Number(s.id) === Number(id));
-    if (item && db.balance >= item.price) {
-        db.balance -= item.price;
-        db.inventory.push({ invId: Date.now(), title: item.title, desc: item.desc });
-        if (item.isOneTime) db.store = db.store.filter(s => Number(s.id) !== Number(id));
-        await saveDB(db);
-        notifyAdmin(`🛍 Куплен товар!\n«${item.title}» отправлен в инвентарь!\nОстаток: ${db.balance} 🪙`);
-        res.json({ success: true, db });
-    } else {
-        res.json({ success: false, message: 'Недостаточно монет!' });
+    const itemIndex = db.store.findIndex(s => String(s.id) === String(id));
+    
+    if (itemIndex > -1) {
+        const item = db.store[itemIndex];
+        if (db.balance >= item.price) {
+            db.balance -= item.price;
+            // Уникальный ID для инвентаря
+            const invId = Date.now().toString() + Math.floor(Math.random() * 1000);
+            db.inventory.push({ invId, title: item.title, desc: item.desc });
+            
+            if (item.isOneTime) db.store.splice(itemIndex, 1);
+            
+            await saveDB(db);
+            notifyAdmin(`🛍 Куплен товар!\n«${item.title}» отправлен в инвентарь!\nОстаток: ${db.balance} 🪙`);
+            return res.json({ success: true, db });
+        } else {
+            return res.json({ success: false, message: 'Недостаточно монет!' });
+        }
     }
+    res.json({ success: false, message: 'Товар не найден!' });
 });
 
 app.post('/api/use-inventory', async (req, res) => {
     const { invId } = req.body;
     const db = await getDB();
-    const item = db.inventory.find(i => Number(i.invId) === Number(invId));
-    if (item) {
-        db.inventory = db.inventory.filter(i => Number(i.invId) !== Number(invId));
+    const itemIndex = db.inventory.findIndex(i => String(i.invId) === String(invId));
+    
+    if (itemIndex > -1) {
+        const item = db.inventory[itemIndex];
+        db.inventory.splice(itemIndex, 1);
         await saveDB(db);
         notifyAdmin(`🔥 ИСПОЛЬЗОВАН ПРЕДМЕТ ИЗ ИНВЕНТАРЯ 🔥\n«${item.title}»`);
     }
@@ -252,6 +268,7 @@ app.get('/', (req, res) => {
         let currentTab = 'tasks';
         const diffColors = { 1: '🟢 Легко', 2: '🟡 Средне', 3: '🔴 Сложно', 4: '🟣 Ультра' };
 
+        // Защита от поломки HTML из-за кавычек
         function escapeHtml(str) {
             if (!str) return '';
             return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
@@ -277,7 +294,7 @@ app.get('/', (req, res) => {
             document.getElementById('ui-level').innerText = 'Уровень ' + g_db.level;
             document.getElementById('ui-balance').innerText = '💰 ' + g_db.balance;
             document.getElementById('ui-exp-text').innerText = 'Общий EXP: ' + g_db.exp + ' / ' + (g_db.level * 200);
-            let fill = (g_db.exp % 200) / 2; // каждые 200 опыта - новый уровень
+            let fill = (g_db.exp % 200) / 2; // Каждые 200 опыта новый уровень (прогресс в %)
             document.getElementById('ui-exp-fill').style.width = fill + '%';
         }
 
@@ -337,7 +354,7 @@ app.get('/', (req, res) => {
                         <h3>📊 Статистика Игрока</h3>
                         <label>Монеты:</label>
                         <input id="st-bal" type="number" value="\${g_db.balance}">
-                        <label>Опыт (Уровень рассчитается сам):</label>
+                        <label>Опыт (Уровень обновится сам):</label>
                         <input id="st-exp" type="number" value="\${g_db.exp}">
                         <button class="action" onclick="updateStats()">Сохранить статы</button>
                     </div>
@@ -361,18 +378,20 @@ app.get('/', (req, res) => {
                 tagsHtml += item.isOneTime ? '<span class="tag">1 раз</span>' : '<span class="tag">Многоразово</span>';
             }
 
+            const safeId = escapeHtml(isInv ? item.invId : item.id);
+
             let actions = '';
             if (!isAdmin) {
-                if (isTask) actions = \`<button class="action" onclick="event.stopPropagation(); completeTask(\${item.id})">Сделано</button>\`;
-                else if (isStore) actions = \`<button class="action" onclick="event.stopPropagation(); buyItem(\${item.id})">Купить</button>\`;
-                else if (isInv) actions = \`<button class="action" onclick="event.stopPropagation(); useInv(\${item.invId})">Использовать</button>\`;
+                if (isTask) actions = \`<button class="action" onclick="event.stopPropagation(); completeTask('\${safeId}')">Сделано</button>\`;
+                else if (isStore) actions = \`<button class="action" onclick="event.stopPropagation(); buyItem('\${safeId}')">Купить</button>\`;
+                else if (isInv) actions = \`<button class="action" onclick="event.stopPropagation(); useInv('\${safeId}')">Использовать</button>\`;
             } else {
                 if (isInv) {
-                    actions = \`<button class="danger small" onclick="event.stopPropagation(); delItem('inventory', \${item.invId})">Удалить из инвентаря</button>\`;
+                    actions = \`<button class="danger small" onclick="event.stopPropagation(); delItem('inventory', '\${safeId}')">Удалить из инвентаря</button>\`;
                 } else {
                     actions = \`
                         <button class="small" onclick="event.stopPropagation(); toggleDesc('edit-\${uid}')">Редактировать</button>
-                        <button class="danger small" onclick="event.stopPropagation(); delItem('\${type}', \${item.id})">Удалить</button>
+                        <button class="danger small" onclick="event.stopPropagation(); delItem('\${type}', '\${safeId}')">Удалить</button>
                     \`;
                 }
             }
@@ -393,7 +412,7 @@ app.get('/', (req, res) => {
                     </select>
                     <label class="checkbox-row"><input type="checkbox" id="eo-\${uid}" \${item.isOneTime?'checked':''}> Одноразовое</label>
                     <label class="checkbox-row"><input type="checkbox" id="es-\${uid}" \${item.isSpecial?'checked':''}> Особое (🌟/💎)</label>
-                    <button onclick="saveItem('\${type}', \${item.id})">Сохранить изменения</button>
+                    <button onclick="saveItem('\${type}', '\${safeId}')">Сохранить изменения</button>
                 </div>
             \` : '';
 
@@ -457,6 +476,12 @@ app.get('/', (req, res) => {
 
         window.delItem = function(type, id) {
             confirmAction('Точно удалить?', async () => {
+                // Optimistic UI update (мгновенное скрытие элемента)
+                if (type === 'task') g_db.tasks = g_db.tasks.filter(t => String(t.id) !== String(id));
+                else if (type === 'store') g_db.store = g_db.store.filter(s => String(s.id) !== String(id));
+                else if (type === 'inventory') g_db.inventory = g_db.inventory.filter(i => String(i.invId) !== String(id));
+                showTab(currentTab);
+
                 const res = await fetch('/api/delete-item', { method: 'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({type, id}) });
                 g_db = await res.json();
                 showTab(currentTab);
@@ -465,6 +490,14 @@ app.get('/', (req, res) => {
 
         window.completeTask = async function(id) {
             if(tg.HapticFeedback) tg.HapticFeedback.impactOccurred('medium');
+            
+            // Optimistic UI (прячем сразу, если одноразовое)
+            const task = g_db.tasks.find(t => String(t.id) === String(id));
+            if (task && task.isOneTime) {
+                g_db.tasks = g_db.tasks.filter(t => String(t.id) !== String(id));
+                showTab(currentTab);
+            }
+
             const res = await fetch('/api/complete-task', { method: 'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({id}) });
             g_db = await res.json();
             updateHeader(); showTab(currentTab);
@@ -473,9 +506,11 @@ app.get('/', (req, res) => {
 
         window.buyItem = async function(id) {
             if(tg.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
+            
             const res = await fetch('/api/buy-item', { method: 'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({id}) });
             const data = await res.json();
             if(!data.success) return alertMsg(data.message);
+            
             g_db = data.db;
             updateHeader(); showTab(currentTab);
             alertMsg('Товар куплен и добавлен в инвентарь!');
@@ -484,6 +519,11 @@ app.get('/', (req, res) => {
         window.useInv = function(invId) {
             confirmAction('Использовать предмет прямо сейчас?', async () => {
                 if(tg.HapticFeedback) tg.HapticFeedback.impactOccurred('heavy');
+                
+                // Optimistic UI (прячем предмет мгновенно)
+                g_db.inventory = g_db.inventory.filter(i => String(i.invId) !== String(invId));
+                showTab(currentTab);
+                
                 const res = await fetch('/api/use-inventory', { method: 'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({invId}) });
                 g_db = await res.json();
                 showTab(currentTab);
