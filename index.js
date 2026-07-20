@@ -9,7 +9,6 @@ const bot = new Telegraf(BOT_TOKEN);
 
 app.use(express.json());
 
-// Временное хранилище в памяти (квесты, товары, баланс)
 let tasks = [
     { id: 1, title: 'Приготовить завтрак', reward: 50 },
     { id: 2, title: 'Обнять при встрече', reward: 20 }
@@ -22,7 +21,14 @@ let store = [
 
 let userBalance = 0;
 
-// API Эндпоинты
+async function notifyAdmin(text) {
+    try {
+        await bot.telegram.sendMessage(ADMIN_ID, text);
+    } catch (e) {
+        console.error('Ошибка отправки уведомления:', e);
+    }
+}
+
 app.get('/api/data', (req, res) => {
     res.json({ tasks, store, balance: userBalance });
 });
@@ -43,29 +49,44 @@ app.post('/api/add-store', (req, res) => {
     res.json({ success: true, store });
 });
 
-app.post('/api/complete-task', (req, res) => {
+app.post('/api/delete-task', (req, res) => {
+    const { id } = req.body;
+    tasks = tasks.filter(t => t.id !== id);
+    res.json({ success: true, tasks });
+});
+
+app.post('/api/delete-store', (req, res) => {
+    const { id } = req.body;
+    store = store.filter(s => s.id !== id);
+    res.json({ success: true, store });
+});
+
+app.post('/api/complete-task', async (req, res) => {
     const { id } = req.body;
     const task = tasks.find(t => t.id === id);
     if (task) {
         userBalance += task.reward;
         tasks = tasks.filter(t => t.id !== id);
+        await notifyAdmin(`✅ Задание выполнено!\n«${task.title}» (+${task.reward} 🪙)\nТекущий баланс: ${userBalance} 🪙`);
     }
     res.json({ success: true, balance: userBalance, tasks });
 });
 
-app.post('/api/buy-item', (req, res) => {
+app.post('/api/buy-item', async (req, res) => {
     const { id } = req.body;
     const item = store.find(s => s.id === id);
     if (item && userBalance >= item.price) {
         userBalance -= item.price;
+        store = store.filter(s => s.id !== id);
+        await notifyAdmin(`🎁 Покупка в магазине!\n«${item.title}» (-${item.price} 🪙)\nОстаток баланса: ${userBalance} 🪙`);
         res.json({ success: true, balance: userBalance });
     } else {
         res.json({ success: false, message: 'Недостаточно монет!' });
     }
 });
 
-// Фронтенд
-const htmlContent = `
+app.get('/', (req, res) => {
+    res.send(`
 <!DOCTYPE html>
 <html>
 <head>
@@ -73,16 +94,16 @@ const htmlContent = `
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <style>
-        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #1c1c1e; color: #fff; padding: 15px; margin: 0; }
+        body { font-family: sans-serif; background: #1c1c1e; color: #fff; padding: 15px; margin: 0; }
         .card { background: #2c2c2e; border-radius: 12px; padding: 15px; margin-bottom: 12px; }
         h2, h3 { margin-top: 0; }
         input, button { width: 100%; padding: 10px; margin-top: 8px; border-radius: 8px; border: none; box-sizing: border-box; }
         input { background: #3a3a3c; color: white; }
-        button { background: #007aff; color: white; font-weight: bold; cursor: pointer; }
+        button { background: #007aff; color: white; font-weight: bold; }
         button.secondary { background: #34c759; }
+        button.danger { background: #ff3b30; }
         .item { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #3a3a3c; padding: 8px 0; }
-        .item:last-child { border-bottom: none; }
-        .badge { background: #ffd60a; color: #000; padding: 3px 8px; border-radius: 12px; font-weight: bold; font-size: 0.9em; }
+        .badge { background: #ffd60a; color: #000; padding: 3px 8px; border-radius: 12px; font-weight: bold; }
     </style>
 </head>
 <body>
@@ -94,7 +115,7 @@ const htmlContent = `
         const tg = window.Telegram.WebApp;
         tg.expand();
         const userId = tg.initDataUnsafe?.user?.id || 0;
-        const isAdmin = userId == ${ADMIN_ID};
+        const isAdmin = (userId == ${ADMIN_ID});
 
         async function loadData() {
             const res = await fetch('/api/data');
@@ -106,45 +127,26 @@ const htmlContent = `
         function render(data) {
             const app = document.getElementById('app');
             if (isAdmin) {
-                app.innerHTML = \`
-                    <div class="card">
-                        <h3>➕ Добавить квест</h3>
-                        <input id="t-title" placeholder="Название квеста">
-                        <input id="t-reward" type="number" placeholder="Награда (монет)">
-                        <button onclick="addTask()">Сохранить квест</button>
-                    </div>
-                    <div class="card">
-                        <h3>➕ Добавить товар</h3>
-                        <input id="s-title" placeholder="Название товара">
-                        <input id="s-price" type="number" placeholder="Цена (монет)">
-                        <button class="secondary" onclick="addStore()">Сохранить товар</button>
-                    </div>
-                \`;
+                let tasksList = data.tasks.map(t => '<div class="item"><div>' + t.title + ' (+' + t.reward + ' 🪙)</div><button class="danger" style="width:auto;" onclick="deleteTask(' + t.id + ')">Удалить</button></div>').join('') || '<p>Заданий нет</p>';
+                let storeList = data.store.map(s => '<div class="item"><div>' + s.title + ' (' + s.price + ' 🪙)</div><button class="danger" style="width:auto;" onclick="deleteStore(' + s.id + ')">Удалить</button></div>').join('') || '<p>Товаров нет</p>';
+
+                app.innerHTML = '<div class="card"><h3>➕ Добавить квест</h3><input id="t-title" placeholder="Название"><input id="t-reward" type="number" placeholder="Награда"><button onclick="addTask()">Сохранить квест</button></div>' +
+                                '<div class="card"><h3>📋 Активные квесты</h3>' + tasksList + '</div>' +
+                                '<div class="card"><h3>➕ Добавить товар</h3><input id="s-title" placeholder="Название"><input id="s-price" type="number" placeholder="Цена"><button class="secondary" onclick="addStore()">Сохранить товар</button></div>' +
+                                '<div class="card"><h3>🎁 Товары в магазине</h3>' + storeList + '</div>';
             } else {
-                let tasksHtml = data.tasks.map(t => \`
-                    <div class="item">
-                        <div>\${t.title} (+\${t.reward} 🪙)</div>
-                        <button style="width:auto;" onclick="completeTask(\${t.id})">Сделано</button>
-                    </div>
-                \`).join('') || '<p>Квестов пока нет</p>';
+                let tasksHtml = data.tasks.map(t => '<div class="item"><div>' + t.title + ' (+' + t.reward + ' 🪙)</div><button style="width:auto;" onclick="completeTask(' + t.id + ')">Сделано</button></div>').join('') || '<p>Квестов нет</p>';
+                let storeHtml = data.store.map(s => '<div class="item"><div>' + s.title + ' (' + s.price + ' 🪙)</div><button class="secondary" style="width:auto;" onclick="buyItem(' + s.id + ')">Купить</button></div>').join('') || '<p>Магазин пуст</p>';
 
-                let storeHtml = data.store.map(s => \`
-                    <div class="item">
-                        <div>\${s.title} (\${s.price} 🪙)</div>
-                        <button class="secondary" style="width:auto;" onclick="buyItem(\${s.id})">Купить</button>
-                    </div>
-                \`).join('') || '<p>Магазин пуст</p>';
-
-                app.innerHTML = \`
-                    <div class="card"><h3>📋 Доступные квесты</h3>\${tasksHtml}</div>
-                    <div class="card"><h3>🎁 Магазин наград</h3>\${storeHtml}</div>
-                \`;
+                app.innerHTML = '<div class="card"><h3>📋 Доступные квесты</h3>' + tasksHtml + '</div>' +
+                                '<div class="card"><h3>🎁 Магазин наград</h3>' + storeHtml + '</div>';
             }
         }
 
         async function addTask() {
             const title = document.getElementById('t-title').value;
             const reward = document.getElementById('t-reward').value;
+            if(!title || !reward) return;
             await fetch('/api/add-task', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({title, reward}) });
             loadData();
         }
@@ -152,7 +154,18 @@ const htmlContent = `
         async function addStore() {
             const title = document.getElementById('s-title').value;
             const price = document.getElementById('s-price').value;
+            if(!title || !price) return;
             await fetch('/api/add-store', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({title, price}) });
+            loadData();
+        }
+
+        async function deleteTask(id) {
+            await fetch('/api/delete-task', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({id}) });
+            loadData();
+        }
+
+        async function deleteStore(id) {
+            await fetch('/api/delete-store', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({id}) });
             loadData();
         }
 
@@ -172,9 +185,11 @@ const htmlContent = `
     </script>
 </body>
 </html>
-`;
-
-app.get('/', (req, res) => res.send(htmlContent));
+    `);
+});
 
 const PORT = process.env.PORT || 3000;
-app.
+app.listen(PORT, () => console.log('Server running on port ' + PORT));
+
+bot.start((ctx) => ctx.reply('Привет! Нажми на кнопку меню, чтобы открыть квесты'));
+bot.launch();
