@@ -14,7 +14,7 @@ const redis = new Redis({
 const EXP_MAP = { 1: 10, 2: 25, 3: 50, 4: 100 };
 
 const DEFAULT_DB = {
-    version: 5, // Версия 5 - удален инвентарь
+    version: 6, // Версия 6 - полностью оптимизированная и без инвентаря
     tasks: [
         { id: '101', title: '«Без паразитов»', desc: 'Провести целый день, не используя в речи слова-паразиты («типа», «как бы», «короче», «ну»)', reward: 30, isOneTime: false, isSpecial: false, diff: 2 },
         { id: '102', title: '«Слово дня»', desc: 'Узнать значение редкого/красивого слова (например, эрудиция, эмпатия, контекст, лаконичность) и уместно использовать его в диалоге со мной 3 раза за день.', reward: 25, isOneTime: false, isSpecial: false, diff: 1 },
@@ -48,16 +48,15 @@ const DEFAULT_DB = {
     exp: 0
 };
 
-function calcLevel(exp) {
-    return Math.floor(exp / 200) + 1;
-}
+function calcLevel(exp) { return Math.floor(exp / 200) + 1; }
 
 async function getDB() {
     try {
         let data = await redis.get('quest_db');
         if (typeof data === 'string') data = JSON.parse(data);
         
-        if (!data || data.version !== 5) {
+        // Если версия старая, обновляем шаблоны заданий, но сохраняем монеты и опыт!
+        if (!data || data.version !== 6) {
             const merged = { ...DEFAULT_DB, balance: data?.balance || 0, exp: data?.exp || 0 };
             merged.level = calcLevel(merged.exp);
             await redis.set('quest_db', merged);
@@ -74,7 +73,7 @@ async function saveDB(db) { await redis.set('quest_db', db); }
 const bot = new Telegraf(BOT_TOKEN);
 app.use(express.json());
 
-// Отправка уведомлений без блокировки интерфейса
+// Асинхронная отправка, не тормозит сервер
 function notifyAdmin(text) {
     bot.telegram.sendMessage(ADMIN_ID, text).catch(() => {});
 }
@@ -82,31 +81,30 @@ function notifyAdmin(text) {
 app.get('/api/data', async (req, res) => { res.json(await getDB()); });
 
 app.post('/api/update-stats', async (req, res) => {
-    const { balance, level, exp } = req.body;
+    const { balance, exp } = req.body;
     const db = await getDB();
     if (balance !== undefined) db.balance = Number(balance);
     if (exp !== undefined) {
         db.exp = Number(exp);
         db.level = calcLevel(db.exp);
     }
-    if (level !== undefined && exp === undefined) db.level = Number(level);
     await saveDB(db);
     res.json(db);
 });
 
 app.post('/api/save-item', async (req, res) => {
-    const { type, id, title, desc, value, isOneTime, isSpecial, diff } = req.body;
+    const { id, type, title, desc, value, isOneTime, isSpecial, diff } = req.body;
     const db = await getDB();
     const list = type === 'task' ? db.tasks : db.store;
     
     let itemIndex = list.findIndex(i => String(i.id) === String(id));
     if (itemIndex > -1) {
-        let item = list[itemIndex];
-        item.title = title; item.desc = desc; item.isOneTime = isOneTime; item.isSpecial = isSpecial;
-        if (type === 'task') { item.reward = Number(value); item.diff = Number(diff); } 
-        else { item.price = Number(value); }
+        list[itemIndex].title = title; list[itemIndex].desc = desc; 
+        list[itemIndex].isOneTime = isOneTime; list[itemIndex].isSpecial = isSpecial;
+        if (type === 'task') { list[itemIndex].reward = Number(value); list[itemIndex].diff = Number(diff); } 
+        else { list[itemIndex].price = Number(value); }
     } else {
-        const newItem = { id: Date.now().toString(), title, desc, isOneTime, isSpecial };
+        const newItem = { id: String(id || Date.now()), title, desc, isOneTime, isSpecial };
         if (type === 'task') { newItem.reward = Number(value); newItem.diff = Number(diff); } 
         else { newItem.price = Number(value); }
         list.push(newItem);
@@ -139,7 +137,7 @@ app.post('/api/complete-task', async (req, res) => {
         if (task.isOneTime) db.tasks.splice(taskIndex, 1);
         
         await saveDB(db);
-        notifyAdmin(`✅ Задание выполнено!\n«${task.title}»\n+${task.reward} 🪙 | +${gainedExp} EXP\nТекущий баланс: ${db.balance} 🪙\nТекущий уровень: ${db.level}`);
+        notifyAdmin(`✅ Задание выполнено!\n«${task.title}»\n+${task.reward} 🪙 | +${gainedExp} EXP\nТекущий баланс: ${db.balance} 🪙\nУровень: ${db.level}`);
     }
     res.json(db);
 });
@@ -153,15 +151,13 @@ app.post('/api/buy-item', async (req, res) => {
         const item = db.store[itemIndex];
         if (db.balance >= item.price) {
             db.balance -= item.price;
-            
             if (item.isOneTime) db.store.splice(itemIndex, 1);
             
             await saveDB(db);
             notifyAdmin(`🛍 Использован товар (Куплено)!\n«${item.title}»\nОстаток баланса: ${db.balance} 🪙`);
             return res.json({ success: true, db });
-        } else {
-            return res.json({ success: false, message: 'Недостаточно монет!' });
         }
+        return res.json({ success: false, message: 'Недостаточно монет!' });
     }
     res.json({ success: false, message: 'Товар не найден!' });
 });
@@ -187,8 +183,8 @@ app.get('/', (req, res) => {
         .exp-bar-fill { height: 100%; background: linear-gradient(90deg, #6b4cff, #a288ff); width: 0%; transition: 0.3s; }
         .exp-text { font-size: 11px; color: #aaa; margin-top: 4px; }
 
-        .tabs-wrapper { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; padding: 8px; background: var(--bg); position: sticky; top: 0; z-index: 10; border-bottom: 1px solid #333;}
-        .tab-btn { padding: 10px 4px; text-align: center; background: var(--card); color: var(--sub); font-weight: bold; border-radius: 8px; border: 1px solid #333; font-size: 11px; display: flex; align-items: center; justify-content: center; cursor: pointer;}
+        .tabs-wrapper { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px; padding: 10px; background: var(--bg); position: sticky; top: 0; z-index: 10; border-bottom: 1px solid #333;}
+        .tab-btn { flex: 1 1 calc(30% - 6px); padding: 10px 4px; text-align: center; background: var(--card); color: var(--sub); font-weight: bold; border-radius: 8px; border: 1px solid #333; font-size: 11px; display: flex; align-items: center; justify-content: center; cursor: pointer; user-select: none;}
         .tab-btn.active { background: var(--accent); color: #fff; border-color: var(--accent); }
 
         .container { padding: 15px; }
@@ -196,7 +192,8 @@ app.get('/', (req, res) => {
         h3 { margin: 0 0 10px 0; font-size: 15px; }
         
         input, select, textarea { width: 100%; padding: 10px; margin-bottom: 10px; border-radius: 8px; border: 1px solid #444; background: #2a2a2e; color: white; font-family: inherit;}
-        button { width: 100%; padding: 12px; border-radius: 8px; border: none; font-weight: bold; font-size: 14px; color: white; cursor: pointer; background: var(--accent); }
+        button { width: 100%; padding: 12px; border-radius: 8px; border: none; font-weight: bold; font-size: 14px; color: white; cursor: pointer; background: var(--accent); transition: transform 0.1s; }
+        button:active { transform: scale(0.96); }
         button.action { background: #34c759; }
         button.danger { background: #ff3b30; }
         button.small { width: auto; padding: 8px 12px; font-size: 12px; margin-left: 5px;}
@@ -210,7 +207,7 @@ app.get('/', (req, res) => {
         .diff-1 { color: var(--d1); } .diff-2 { color: var(--d2); } .diff-3 { color: var(--d3); } .diff-4 { color: var(--d4); }
         .item-val { font-weight: 900; font-size: 15px; color: #ffd60a; margin-left: 10px;}
         
-        .item-body { padding: 0 12px 12px 12px; display: none; border-top: 1px dashed #333; margin-top: 5px; padding-top: 10px; font-size: 13px; color: #bbb;}
+        .item-body { padding: 0 12px 12px 12px; display: none; border-top: 1px dashed #333; margin-top: 5px; padding-top: 10px; font-size: 13px; color: #bbb; line-height: 1.4;}
         .item-body.open { display: block; }
         .item-actions { display: flex; gap: 8px; margin-top: 12px; }
         .admin-edit-form { background: #222; padding: 10px; border-radius: 8px; margin-top: 10px; border: 1px solid #444;}
@@ -247,8 +244,8 @@ app.get('/', (req, res) => {
         let g_db = { tasks: [], store: [], balance: 0, level: 1, exp: 0 };
         let currentTab = 'tasks';
         const diffColors = { 1: '🟢 Легко', 2: '🟡 Средне', 3: '🔴 Сложно', 4: '🟣 Ультра' };
+        const EXP_MAP = { 1: 10, 2: 25, 3: 50, 4: 100 };
 
-        // Защита кавычек
         function escapeHtml(str) {
             if (!str) return '';
             return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
@@ -351,7 +348,6 @@ app.get('/', (req, res) => {
             let tagsHtml = '';
             if (isTask) tagsHtml += \`<span class="tag">\${diffColors[item.diff].split(' ')[1]}</span>\`;
             tagsHtml += item.isOneTime ? '<span class="tag">1 раз</span>' : '<span class="tag">Многоразово</span>';
-            
 
             const safeId = escapeHtml(item.id);
 
@@ -391,12 +387,12 @@ app.get('/', (req, res) => {
                     <div class="item-header" onclick="toggleDesc('desc-\${uid}')">
                         <div class="item-title-block">
                             <div class="item-title">\${diffIcon}\${safeTitle}</div>
-                            <div class="item-tags">\${tagsHtml}</div>
+                            \${tagsHtml ? \`<div class="item-tags">\${tagsHtml}</div>\` : ''}
                         </div>
-                        <div class="item-val">\${valLabel} 🪙</div>
+                        \${valLabel ? \`<div class="item-val">\${valLabel} 🪙</div>\` : ''}
                     </div>
                     <div class="item-body" id="desc-\${uid}">
-                        \${safeDesc}
+                        \${safeDesc || 'Без описания'}
                         <div class="item-actions">\${actions}</div>
                     </div>
                     \${editForm}
@@ -404,19 +400,27 @@ app.get('/', (req, res) => {
             \`;
         }
 
-        window.updateStats = async function() {
+        window.updateStats = function() {
             const b = document.getElementById('st-bal').value;
             const e = document.getElementById('st-exp').value;
-            const res = await fetch('/api/update-stats', { method: 'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({balance:b, exp:e}) });
-            g_db = await res.json();
-            updateHeader(); 
+            
+            // ОПТИМИСТИЧНОЕ ОБНОВЛЕНИЕ (моментально)
+            g_db.balance = Number(b);
+            g_db.exp = Number(e);
+            g_db.level = Math.floor(g_db.exp / 200) + 1;
+            updateHeader();
             alertMsg('Статистика сохранена!');
+            
+            // ФОНОВЫЙ ЗАПРОС
+            fetch('/api/update-stats', { method: 'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({balance:b, exp:e}) })
+                .then(res => res.json()).then(db => { g_db = db; });
         }
 
-        window.saveItem = async function(type, id = null) {
+        window.saveItem = function(type, id = null) {
             let data = {};
             if (type === 'new') {
                 data = {
+                    id: Date.now().toString(),
                     type: document.getElementById('a-type').value,
                     title: document.getElementById('a-title').value,
                     desc: document.getElementById('a-desc').value,
@@ -428,7 +432,8 @@ app.get('/', (req, res) => {
             } else {
                 const uid = type + '-' + id;
                 data = {
-                    type, id,
+                    id: String(id),
+                    type: type,
                     title: document.getElementById('et-' + uid).value,
                     desc: document.getElementById('ed-' + uid).value,
                     value: document.getElementById('ev-' + uid).value,
@@ -439,64 +444,103 @@ app.get('/', (req, res) => {
             }
             if(!data.title || !data.value) return alertMsg('Введи название и значение!');
             
-            const res = await fetch('/api/save-item', { method: 'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(data) });
-            g_db = await res.json();
-            showTab(currentTab);
+            // ОПТИМИСТИЧНОЕ ОБНОВЛЕНИЕ
+            const list = data.type === 'task' ? g_db.tasks : g_db.store;
+            if (type === 'new') {
+                const newItem = { id: data.id, title: data.title, desc: data.desc, isOneTime: data.isOneTime, isSpecial: data.isSpecial };
+                if (data.type === 'task') { newItem.reward = Number(data.value); newItem.diff = Number(data.diff); }
+                else { newItem.price = Number(data.value); }
+                list.push(newItem);
+                
+                document.getElementById('a-title').value = '';
+                document.getElementById('a-desc').value = '';
+                document.getElementById('a-val').value = '';
+                alertMsg('Успешно добавлено!');
+            } else {
+                const idx = list.findIndex(i => String(i.id) === String(data.id));
+                if (idx > -1) {
+                    list[idx].title = data.title; list[idx].desc = data.desc;
+                    list[idx].isOneTime = data.isOneTime; list[idx].isSpecial = data.isSpecial;
+                    if (data.type === 'task') { list[idx].reward = Number(data.value); list[idx].diff = Number(data.diff); }
+                    else { list[idx].price = Number(data.value); }
+                }
+                alertMsg('Сохранено!');
+            }
+            showTab(currentTab); // Перерисовка без задержки
+            
+            // ФОНОВЫЙ ЗАПРОС
+            fetch('/api/save-item', { method: 'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(data) })
+                .then(res => res.json()).then(db => { g_db = db; });
         }
 
         window.delItem = function(type, id) {
-            confirmAction('Точно удалить?', async () => {
-                // Optimistic UI update (мгновенное скрытие элемента)
+            confirmAction('Точно удалить?', () => {
+                // ОПТИМИСТИЧНОЕ ОБНОВЛЕНИЕ
                 if (type === 'task') g_db.tasks = g_db.tasks.filter(t => String(t.id) !== String(id));
                 else if (type === 'store') g_db.store = g_db.store.filter(s => String(s.id) !== String(id));
                 showTab(currentTab);
 
-                const res = await fetch('/api/delete-item', { method: 'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({type, id}) });
-                g_db = await res.json();
-                showTab(currentTab);
+                // ФОНОВЫЙ ЗАПРОС
+                fetch('/api/delete-item', { method: 'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({type, id}) })
+                    .then(res => res.json()).then(db => { g_db = db; });
             });
         }
 
-        window.completeTask = async function(id) {
+        window.completeTask = function(id) {
             if(tg.HapticFeedback) tg.HapticFeedback.impactOccurred('medium');
             
-            // Optimistic UI (прячем сразу, если одноразовое)
-            const task = g_db.tasks.find(t => String(t.id) === String(id));
-            if (task && task.isOneTime) {
-                g_db.tasks = g_db.tasks.filter(t => String(t.id) !== String(id));
+            // ОПТИМИСТИЧНОЕ ОБНОВЛЕНИЕ
+            const taskIndex = g_db.tasks.findIndex(t => String(t.id) === String(id));
+            if (taskIndex > -1) {
+                const task = g_db.tasks[taskIndex];
+                const gainedExp = EXP_MAP[task.diff] || 10;
+                
+                g_db.balance += Number(task.reward);
+                g_db.exp += gainedExp;
+                g_db.level = Math.floor(g_db.exp / 200) + 1;
+                
+                if (task.isOneTime) g_db.tasks.splice(taskIndex, 1);
+                
+                updateHeader();
                 showTab(currentTab);
+                alertMsg('Задание выполнено! Награда начислена.');
             }
 
-            const res = await fetch('/api/complete-task', { method: 'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({id}) });
-            g_db = await res.json();
-            updateHeader(); showTab(currentTab);
-            alertMsg('Задание выполнено! Награда начислена.');
+            // ФОНОВЫЙ ЗАПРОС (для записи в облако и уведомления)
+            fetch('/api/complete-task', { method: 'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({id}) })
+                .then(res => res.json()).then(db => { g_db = db; });
         }
 
-        window.buyItem = async function(id) {
-            confirmAction('Точно использовать (купить) этот товар?', async () => {
+        window.buyItem = function(id) {
+            confirmAction('Точно использовать (купить) этот товар?', () => {
                 if(tg.HapticFeedback) tg.HapticFeedback.impactOccurred('heavy');
                 
-                // Мгновенно убираем, если одноразовое и хватает денег
-                const item = g_db.store.find(s => String(s.id) === String(id));
-                if (item && g_db.balance >= item.price && item.isOneTime) {
-                    g_db.store = g_db.store.filter(s => String(s.id) !== String(id));
-                    showTab(currentTab);
+                // ОПТИМИСТИЧНОЕ ОБНОВЛЕНИЕ
+                const itemIndex = g_db.store.findIndex(s => String(s.id) === String(id));
+                if (itemIndex > -1) {
+                    const item = g_db.store[itemIndex];
+                    if (g_db.balance >= item.price) {
+                        g_db.balance -= item.price;
+                        if (item.isOneTime) g_db.store.splice(itemIndex, 1);
+                        
+                        updateHeader();
+                        showTab(currentTab);
+                        alertMsg('Товар успешно использован! Я получил уведомление.');
+                    } else {
+                        return alertMsg('Недостаточно монет!');
+                    }
                 }
 
-                const res = await fetch('/api/buy-item', { method: 'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({id}) });
-                const data = await res.json();
-                if(!data.success) {
-                    // Если денег не хватило, возвращаем обратно с сервера актуальную базу
-                    const fallbackRes = await fetch('/api/data');
-                    g_db = await fallbackRes.json();
-                    showTab(currentTab);
-                    return alertMsg(data.message);
-                }
-                
-                g_db = data.db;
-                updateHeader(); showTab(currentTab);
-                alertMsg('Товар успешно использован! Я получил уведомление.');
+                // ФОНОВЫЙ ЗАПРОС (для записи в облако и уведомления)
+                fetch('/api/buy-item', { method: 'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({id}) })
+                    .then(res => res.json()).then(data => { 
+                        if (!data.success) { // Откат, если вдруг баг
+                            alertMsg(data.message);
+                            fetch('/api/data').then(r=>r.json()).then(db=>{ g_db=db; updateHeader(); showTab(currentTab); });
+                        } else {
+                            g_db = data.db; 
+                        }
+                    });
             });
         }
 
